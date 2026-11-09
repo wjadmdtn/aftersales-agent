@@ -1,0 +1,77 @@
+[
+  {
+    "order_id": "ORD1001",
+    "status": "PENDING_PAYMENT",
+    "amount": "99.00",
+    "address": {"receiver": "张三", "phone": "13800138000", "province": "广东省", "city": "深圳市", "district": "南山区", "detail": "科技园路1号"},
+    "logistics": null
+  },
+  {
+    "order_id": "ORD1002",
+    "status": "PAID",
+    "amount": "259.90",
+    "address": {"receiver": "李四", "phone": "13900139000", "province": "浙江省", "city": "杭州市", "district": "西湖区", "detail": "文三路2号"},
+    "logistics": null
+  },
+  {
+    "order_id": "ORD1003",
+    "status": "SHIPPED",
+    "amount": "128.00",
+    "address": {"receiver": "王五", "phone": "13700137000", "province": "江苏省", "city": "南京市", "district": "鼓楼区", "detail": "中山路3号"},
+    "logistics": {
+      "current_node": "已到达南京转运中心",
+      "tracks": [
+        {"node": "商家已发货", "at": "2026-11-05T10:00:00Z"},
+        {"node": "杭州转运中心已发出", "at": "2026-11-06T03:20:00Z"},
+        {"node": "已到达南京转运中心", "at": "2026-11-07T08:45:00Z"}
+      ]
+    }
+  },
+  {
+    "order_id": "ORD1004",
+    "status": "DELIVERED",
+    "amount": "58.50",
+    "address": {"receiver": "赵六", "phone": "13600136000", "province": "北京市", "city": "北京市", "district": "朝阳区", "detail": "建国路4号"},
+    "logistics": {
+      "current_node": "已签收",
+      "tracks": [
+        {"node": "商家已发货", "at": "2026-10-28T09:00:00Z"},
+        {"node": "已签收", "at": "2026-10-31T14:12:00Z"}
+      ]
+    }
+  },
+  {
+    "order_id": "ORD1005",
+    "status": "CLOSED",
+    "amount": "19.90",
+    "address": {"receiver": "钱七", "phone": "13500135000", "province": "四川省", "city": "成都市", "district": "武侯区", "detail": "天府大道5号"},
+    "logistics": null
+  },
+  {
+    "order_id": "ORD1006",
+    "status": "REFUNDING",
+    "amount": "399.00",
+    "address": {"receiver": "孙八", "phone": "13400134000", "province": "湖北省", "city": "武汉市", "district": "洪山区", "detail": "光谷大道6号"},
+    "logistics": {
+      "current_node": "已到达武汉转运中心",
+      "tracks": [{"node": "商家已发货", "at": "2026-11-01T11:00:00Z"}]
+    }
+  },
+  {
+    "order_id": "ORD1007",
+    "status": "REFUNDED",
+    "amount": "668.00",
+    "address": {"receiver": "周九", "phone": "13300133000", "province": "福建省", "city": "厦门市", "district": "思明区", "detail": "环岛路7号"},
+    "logistics": {
+      "current_node": "已签收",
+      "tracks": [{"node": "已签收", "at": "2026-10-20T16:00:00Z"}]
+    }
+  },
+  {
+    "order_id": "ORD1008",
+    "status": "PAID",
+    "amount": "500.00",
+    "address": {"receiver": "吴十", "phone": "13200132000", "province": "山东省", "city": "青岛市", "district": "市南区", "detail": "香港中路8号"},
+    "logistics": null
+  }
+]
