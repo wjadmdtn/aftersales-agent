@@ -87,5 +87,28 @@ async def test_complaint_does_not_trigger_action(chat, env):
 
 
 async def test_unknown_input_asks_clarification(chat):
+    """识别不到工具时先澄清，不直接转人工。"""
     r = await chat("随便说点什么")
-    assert r["state"] == "unclear"
+    assert r["state"] == "clarifying"
+    assert "没能完全理解" in r["reply"]
+
+
+async def test_second_clarify_gives_options(chat):
+    await chat("这个东西不好用")
+    r = await chat("嗯……")
+    assert r["state"] == "clarifying"
+    assert "1. 查询订单" in r["reply"]
+
+
+async def test_clarify_then_handoff_after_limit(env, chat):
+    """澄清 2 轮后仍无法确定诉求，才转人工。"""
+    await chat("随便说点什么")
+    await chat("还是不懂")
+    r = await chat("嗯")
+    assert r["state"] == "handoff_queued", "第 3 轮应转人工"
+
+
+async def test_manual_request_skips_clarification(chat):
+    """用户直接要人工时不澄清。"""
+    r = await chat("转人工")
+    assert r["state"] == "handoff_queued"

@@ -189,11 +189,35 @@ class AgentLoop:
                 state, message, primary_intent="complaint", trace_id=trace_id
             )
 
-        return AgentReply(
-            reply="抱歉，我没太理解您的意思，可以说得具体一些吗？",
-            intent=intent,
-            state="unclear",
-        )
+        # 无法识别可调用的工具：澄清优先，转人工是最后手段。
+        # "AI 一时没理解"不等于"用户需要人工"——直接转会把人工成本吃光。
+        return await self._clarify(state, message, trace_id=trace_id)
+
+    CLARIFY_ROUND_LIMIT = 2
+
+    async def _clarify(
+        self, state: SessionState, message: str, *, trace_id: str
+    ) -> AgentReply:
+        state.clarify_round += 1
+
+        if state.clarify_round > self.CLARIFY_ROUND_LIMIT:
+            state.clarify_round = 0
+            return await self._handoff(
+                state, message, primary_intent="general", trace_id=trace_id
+            )
+
+        if state.clarify_round == 1:
+            reply = "抱歉，我这边没能完全理解您的意思。您是想咨询订单问题，还是有其他需要帮忙的？"
+        else:
+            reply = (
+                "为了更快帮到您，请问是哪一类呢？\n"
+                "1. 查询订单 / 物流\n"
+                "2. 修改收货地址\n"
+                "3. 申请退款\n"
+                "4. 其他问题"
+            )
+
+        return AgentReply(reply=reply, intent=None, state="clarifying")
 
     async def _handoff(
         self, state: SessionState, message: str, *, primary_intent: str, trace_id: str

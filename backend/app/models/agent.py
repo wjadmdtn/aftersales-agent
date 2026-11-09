@@ -72,6 +72,7 @@ class SessionState(BaseModel):
     snapshot: OrderSnapshot | None = None
     intent: Intent | None = None
     turn_count: int = 0
+    clarify_round: int = 0
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
