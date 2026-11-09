@@ -68,7 +68,13 @@ async def env():
     classifier = IntentClassifier(stub, keyword_map={})
     tools = InProcessMockClient(mock_app)
 
-    agent_routes.configure_agent(classifier=classifier, sessions=store, tools=tools)
+    from app.handoff.coordinator import HandoffCoordinator
+    from app.handoff.queue import HandoffQueue
+
+    coordinator = HandoffCoordinator(HandoffQueue(redis))
+    agent_routes.configure_agent(
+        classifier=classifier, sessions=store, tools=tools, coordinator=coordinator
+    )
     agent_app = create_app()
 
     async with AsyncClient(transport=ASGITransport(app=agent_app), base_url="http://agent") as ac:

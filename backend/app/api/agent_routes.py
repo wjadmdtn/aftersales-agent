@@ -43,9 +43,17 @@ class ChatResponse(BaseModel):
 _loop: AgentLoop | None = None
 
 
-def configure_agent(*, classifier: IntentClassifier, sessions: SessionStore, tools: MockServiceClient) -> None:
+def configure_agent(
+    *,
+    classifier: IntentClassifier,
+    sessions: SessionStore,
+    tools: MockServiceClient,
+    coordinator=None,
+) -> None:
     global _loop
-    _loop = AgentLoop(classifier=classifier, sessions=sessions, tools=tools)
+    _loop = AgentLoop(
+        classifier=classifier, sessions=sessions, tools=tools, coordinator=coordinator
+    )
 
 
 def get_loop() -> AgentLoop:

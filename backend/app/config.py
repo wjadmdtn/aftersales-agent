@@ -42,6 +42,60 @@ class Settings(BaseSettings):
         default='["确认","确定","是的","对","好的","可以","同意"]'
     )
 
+
+    # --- handoff (feature 003) ---
+    risk_amount_threshold: float = Field(default=500.0, ge=0)
+    risk_keywords_raw: str = Field(
+        default='["投诉","消协","12315","曝光","举报","起诉","差评","骗子","欺诈"]'
+    )
+    user_request_keywords_raw: str = Field(
+        default='["转人工","人工客服","人工","找真人","真人","找客服"]'
+    )
+    angry_keywords_raw: str = Field(
+        default='["垃圾","骗子","太差了","恶心","差评","坑人","废物","滚","什么破"]'
+    )
+    negative_keywords_raw: str = Field(default='["不满意","生气","失望","麻烦","怎么回事"]')
+    tool_failure_threshold: int = Field(default=3, ge=1)
+    rag_similarity_threshold: float = Field(default=0.6, ge=0, le=1)
+    handoff_scripts_raw: str = Field(
+        default="""{
+  "user_request": "好的，正在为您接入人工客服，请稍候。",
+  "risk": "非常抱歉给您带来了不好的体验，已为您优先接入人工客服，请稍候。",
+  "system_error": "抱歉，系统这边出了点状况，已为您接入人工客服协助处理，请稍候。",
+  "boundary": "这个问题我这边没能处理，已为您接入人工客服，请稍候。",
+  "queued_followup": "正在为您接入人工客服，请稍候～",
+  "queued_ask_time": "正在为您排队接入人工客服，接通的瞬间会自动通知您～",
+  "declined": "非常抱歉，这个问题需要升级到专员为您跟进，稍后会有同事联系您。"
+}"""
+    )
+
+    @field_validator("risk_keywords_raw", "user_request_keywords_raw", "angry_keywords_raw",
+                     "negative_keywords_raw", "handoff_scripts_raw")
+    @classmethod
+    def _validate_json_handoff(cls, v: str) -> str:
+        json.loads(v)
+        return v
+
+    @property
+    def risk_keywords(self) -> tuple[str, ...]:
+        return tuple(json.loads(self.risk_keywords_raw))
+
+    @property
+    def user_request_keywords(self) -> tuple[str, ...]:
+        return tuple(json.loads(self.user_request_keywords_raw))
+
+    @property
+    def angry_keywords(self) -> tuple[str, ...]:
+        return tuple(json.loads(self.angry_keywords_raw))
+
+    @property
+    def negative_keywords(self) -> tuple[str, ...]:
+        return tuple(json.loads(self.negative_keywords_raw))
+
+    @property
+    def handoff_scripts(self) -> dict[str, str]:
+        return json.loads(self.handoff_scripts_raw)
+
     @field_validator("keyword_hints_raw", "degrade_write_keywords_raw", "confirm_words_raw")
     @classmethod
     def _validate_json(cls, v: str) -> str:

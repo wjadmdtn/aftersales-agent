@@ -68,15 +68,19 @@ async def test_logistics_read_flow(chat):
 
 
 async def test_manual_handoff_intent(chat):
+    """003 起：转人工进入队列，不再只是打个标记。"""
     r = await chat("转人工")
     assert r["intent"] == Intent.MANUAL
-    assert r["state"] == "handoff_pending"
+    assert r["state"] == "handoff_queued"
+    assert "人工客服" in r["reply"]
 
 
 async def test_complaint_does_not_trigger_action(chat, env):
+    """投诉走人工，且不得因此动钱。"""
     r = await chat("我要投诉", order="ORD1002")
     assert r["intent"] == Intent.COMPLAINT
     assert r["tool_calls"] == []
+    assert r["state"] == "handoff_queued"
 
     order = (await env["mock_client"].get("/orders/ORD1002")).json()
     assert order["data"]["status"] == "PAID"

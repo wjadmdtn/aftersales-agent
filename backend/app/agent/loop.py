@@ -58,10 +58,12 @@ class AgentLoop:
         classifier: IntentClassifier,
         sessions: SessionStore,
         tools: MockServiceClient,
+        coordinator=None,
     ):
         self.classifier = classifier
         self.sessions = sessions
         self.tools = tools
+        self.coordinator = coordinator
 
     async def handle(
         self,
@@ -177,23 +179,51 @@ class AgentLoop:
             return await self._handle_write(state, intent, message, trace_id=trace_id)
 
         if intent is Intent.MANUAL:
-            return AgentReply(
-                reply="好的，正在为您转接人工客服，请稍候。",
-                intent=intent,
-                state="handoff_pending",
+            return await self._handoff(
+                state, message, primary_intent="manual", trace_id=trace_id
             )
 
         if intent is Intent.COMPLAINT:
-            return AgentReply(
-                reply="非常抱歉给您带来了不好的体验，我这边帮你记录下来并反馈处理。",
-                intent=intent,
-                state="complaint_logged",
+            # 投诉一律走人工：风险触发，跳过自助建议，优先级高
+            return await self._handoff(
+                state, message, primary_intent="complaint", trace_id=trace_id
             )
 
         return AgentReply(
             reply="抱歉，我没太理解您的意思，可以说得具体一些吗？",
             intent=intent,
             state="unclear",
+        )
+
+    async def _handoff(
+        self, state: SessionState, message: str, *, primary_intent: str, trace_id: str
+    ) -> AgentReply:
+        if self.coordinator is None:
+            return AgentReply(reply="正在为您接入人工客服，请稍候。", state="handoff_pending")
+
+        trigger = self.coordinator.detect(user_message=message)
+        if not trigger.triggered:
+            # 意图是 manual/complaint 但关键词没命中时，仍按该意图转接
+            from app.models.handoff import TriggerResult, TriggerType
+
+            trigger = TriggerResult.fire(
+                TriggerType.RISK if primary_intent == "complaint" else TriggerType.USER_REQUEST,
+                f"意图识别为 {primary_intent}",
+                skip_self_service=(primary_intent == "complaint"),
+            )
+
+        outcome = await self.coordinator.initiate(
+            session_id=state.session_id,
+            user_id=state.user_id,
+            user_message=message,
+            primary_intent=primary_intent,
+            trigger=trigger,
+            order_id=state.order_id,
+        )
+        return AgentReply(
+            reply=outcome.reply,
+            intent=Intent.MANUAL if primary_intent == "manual" else Intent.COMPLAINT,
+            state="handoff_queued",
         )
 
     async def _handle_read(
