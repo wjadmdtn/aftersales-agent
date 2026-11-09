@@ -6,7 +6,7 @@ from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, model_validator
 
-from app.models.enums import ResultCode, REJECTED_RANGE
+from app.models.enums import ERROR_RANGE, NOT_FOUND_RANGE, REJECTED_RANGE, ResultCode
 
 T = TypeVar("T")
 
@@ -35,7 +35,7 @@ def ok(data: T, meta: ResultMeta) -> BizResult[T]:
 
 
 def not_found(code: ResultCode, meta: ResultMeta, *, data: T | None = None) -> BizResult[T]:
-    if code not in range(2000, 3000):
+    if code not in NOT_FOUND_RANGE:
         raise ValueError(f"{code.name} is not a NOT_FOUND code")
     return BizResult(code=code, data=data, meta=meta)
 
@@ -47,7 +47,7 @@ def rejected(code: ResultCode, reason: str, meta: ResultMeta) -> BizResult[Any]:
 
 
 def error(code: ResultCode, reason: str, meta: ResultMeta) -> BizResult[Any]:
-    if code not in range(4000, 5000):
+    if code not in ERROR_RANGE:
         raise ValueError(f"{code.name} is not an ERROR code")
     return BizResult(code=code, reason=reason, meta=meta)
 

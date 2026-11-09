@@ -23,8 +23,12 @@ class CallRecord(BaseModel):
 
 
 class CallRecorder:
-    def __init__(self, capacity: int = 10000):
-        self._records: deque[CallRecord] = deque(maxlen=capacity)
+    def __init__(self, capacity: int | None = None):
+        from app.config import settings
+
+        self._records: deque[CallRecord] = deque(
+            maxlen=capacity if capacity is not None else settings.call_record_capacity
+        )
         self._attempts: dict[tuple[str, str], int] = {}
 
     def append(self, record: CallRecord) -> None:

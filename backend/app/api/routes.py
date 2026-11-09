@@ -2,16 +2,21 @@
 from __future__ import annotations
 
 import logging
+from decimal import Decimal
 
 from fastapi import APIRouter, Request
+from pydantic import BaseModel, Field
 
 from app.config import settings
+from app.models.domain import Address
 from app.models.enums import ResultCode
 from app.models.results import BizResult, ResultMeta
 from app.observability.recorder import CallRecord, CallRecorder
 from app.observability.trace import current_trace_id, elapsed_ms
+from app.services import address as address_service
 from app.services import logistics as logistics_service
 from app.services import order as order_service
+from app.services import refund as refund_service
 from app.store.memory import MemoryStore
 
 logger = logging.getLogger(__name__)
@@ -92,6 +97,46 @@ async def get_logistics(order_id: str, request: Request) -> BizResult:
     result = logistics_service.get_logistics(get_store(), order_id, meta)
     _record(result, action="logistics.get", request=request, payload={"order_id": order_id})
     logger.info("logistics.get order_id=%s code=%s", order_id, result.code.name)
+    return result
+
+
+class RefundRequest(BaseModel):
+    amount: Decimal = Field(gt=0, decimal_places=2)
+
+
+@router.post("/orders/{order_id}/refund", response_model=BizResult)
+async def create_refund(
+    order_id: str, payload: RefundRequest, request: Request
+) -> BizResult:
+    meta = meta_of(request)
+    request_id = request.headers.get("X-Request-Id", "")
+    result = await refund_service.create_refund(
+        get_store(), order_id, payload.amount, request_id, meta
+    )
+    _record(
+        result,
+        action=refund_service.ACTION,
+        request=request,
+        payload={"order_id": order_id, "amount": str(payload.amount)},
+        request_id=request_id or None,
+    )
+    logger.info("refund.create order_id=%s code=%s", order_id, result.code.name)
+    return result
+
+
+@router.put("/orders/{order_id}/address", response_model=BizResult)
+async def update_address(
+    order_id: str, address: Address, request: Request
+) -> BizResult:
+    meta = meta_of(request)
+    result = await address_service.update_address(get_store(), order_id, address, meta)
+    _record(
+        result,
+        action="address.update",
+        request=request,
+        payload={"order_id": order_id},
+    )
+    logger.info("address.update order_id=%s code=%s", order_id, result.code.name)
     return result
 
 

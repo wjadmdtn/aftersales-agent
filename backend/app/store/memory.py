@@ -15,7 +15,11 @@ from app.store.seed import SeedData, load_seed
 
 
 class MemoryStore:
-    def __init__(self, seed_path: str | Path, lock_shards: int = 16):
+    def __init__(self, seed_path: str | Path, lock_shards: int | None = None):
+        from app.config import settings
+
+        if lock_shards is None:
+            lock_shards = settings.refund_lock_shards
         self._seed_path = seed_path
         self._data: SeedData = load_seed(seed_path)
         self._refunds: dict[str, Refund] = {}

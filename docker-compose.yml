@@ -1,0 +1,15 @@
+services:
+  mock-service:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      MOCK_SEED_PATH: seed/orders.json
+      MOCK_FAULT_ENABLED: "true"
+      MOCK_DEBUG_ENDPOINTS_ENABLED: "true"
+      MOCK_LOG_LEVEL: INFO
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
