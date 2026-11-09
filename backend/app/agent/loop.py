@@ -206,16 +206,15 @@ class AgentLoop:
                 state, message, primary_intent="general", trace_id=trace_id
             )
 
+        from app.agent.clarify import clarify_round_one, clarify_round_two
+        from app.handoff.emotion import detect_emotion
+        from app.models.handoff import Emotion
+
         if state.clarify_round == 1:
-            reply = "抱歉，我这边没能完全理解您的意思。您是想咨询订单问题，还是有其他需要帮忙的？"
+            negative = detect_emotion(message) is not Emotion.NEUTRAL
+            reply = clarify_round_one(negative=negative)
         else:
-            reply = (
-                "为了更快帮到您，请问是哪一类呢？\n"
-                "1. 查询订单 / 物流\n"
-                "2. 修改收货地址\n"
-                "3. 申请退款\n"
-                "4. 其他问题"
-            )
+            reply = clarify_round_two()
 
         return AgentReply(reply=reply, intent=None, state="clarifying")
 

@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     angry_keywords_raw: str = Field(
         default='["垃圾","骗子","太差了","恶心","差评","坑人","废物","滚","什么破"]'
     )
-    negative_keywords_raw: str = Field(default='["不满意","生气","失望","麻烦","怎么回事"]')
+    negative_keywords_raw: str = Field(default='["不满意","生气","失望","麻烦","怎么回事","不好用","不好使","用不了","有问题","坏了","划痕","破损","质量差","太慢","等太久"]')
     tool_failure_threshold: int = Field(default=3, ge=1)
     rag_similarity_threshold: float = Field(default=0.6, ge=0, le=1)
     handoff_scripts_raw: str = Field(

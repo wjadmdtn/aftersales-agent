@@ -90,14 +90,31 @@ async def test_unknown_input_asks_clarification(chat):
     """识别不到工具时先澄清，不直接转人工。"""
     r = await chat("随便说点什么")
     assert r["state"] == "clarifying"
-    assert "没能完全理解" in r["reply"]
+    assert "具体情况" in r["reply"]
 
 
-async def test_second_clarify_gives_options(chat):
+async def test_negative_input_gets_apology(chat):
+    """用户表达不满时先道歉，而不是说"我没理解"。"""
+    r = await chat("这个东西不好用")
+    assert r["state"] == "clarifying"
+    assert r["reply"].startswith("非常抱歉给您带来了不好的体验。")
+
+
+async def test_clarify_never_promises_business_action(chat):
+    """澄清话术不得出现退款、退换、补偿等业务承诺。"""
+    banned = ["退款", "退货", "退换", "换货", "补发", "补偿", "赔付", "帮您申请"]
+    r = await chat("这个东西不好用")
+    for w in banned:
+        assert w not in r["reply"], f"澄清话术出现业务承诺「{w}」：{r['reply']}"
+
+
+async def test_second_clarify_offers_handoff(chat):
+    """第 2 轮征求转人工，不再列业务选项。"""
     await chat("这个东西不好用")
     r = await chat("嗯……")
     assert r["state"] == "clarifying"
-    assert "1. 查询订单" in r["reply"]
+    assert "人工" in r["reply"]
+    assert "1. 查询订单" not in r["reply"]
 
 
 async def test_clarify_then_handoff_after_limit(env, chat):
