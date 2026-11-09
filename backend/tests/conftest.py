@@ -17,3 +17,6 @@ async def client(app):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
+
+
+from tests.conftest_agent import *  # noqa: F401,F403,E402

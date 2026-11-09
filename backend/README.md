@@ -172,3 +172,84 @@ tests/integration/  并发幂等、故障注入、链路传播
 - `test_same_request_id_concurrent_produces_one_refund` — 50 并发只退一次
 - `test_different_request_ids_concurrent_only_one_succeeds` — 不同键并发只成功一笔
 - `test_retry_keeps_request_id_but_changes_trace` — attempt 1/2/3，trace 各不相同
+
+---
+
+## Agent 接口（Feature 002）
+
+`POST /agent/chat`
+
+```json
+{
+  "session_id": "s1",
+  "user_id": "u1",
+  "message": "我要退款",
+  "order_id": "ORD1002",
+  "snapshot": {"name": "耳机", "amount": "259.90"}
+}
+```
+
+响应：
+
+```json
+{
+  "reply": "即将为订单 ORD1002 提交退款 259.90 元，确认吗？",
+  "intent": "refund",
+  "source": "llm",
+  "tool_calls": [],
+  "state": "awaiting_confirmation",
+  "trace_id": "a1b2..."
+}
+```
+
+### 意图识别：LLM 主导，关键词只作提示
+
+关键词只能说明"提到了"，不能说明"想干什么"：
+
+| 用户说 | 真实意图 |
+|---|---|
+| 我要退款 | 发起退款 |
+| 再不处理我就投诉你们不肯退款 | 威胁施压 |
+| 这个能退款吗 | 咨询可行性 |
+| 上次退款拖了半个月 | 陈述历史 |
+| 别再发退款短信了 | 反向表达 |
+| 钱什么时候能回来 | 想退款（无关键词） |
+
+因此 `collect_hints()` 只收集词，结果**完全由 LLM 决定**。`tests/unit/test_intent_parse.py` 里有一组测试专门断言 hints 不影响判定结果。
+
+### 降级：每次请求都先调 LLM，单次失败才降级
+
+不做熔断——熔断会在冷却期跳过 LLM，等于用关键词替代判断。
+
+```
+请求 → 调 LLM
+        ├─ 成功 → 正常路径
+        └─ 超时/报错/返回不合法 → 本次降级
+```
+
+降级时用**更宽的写操作词表**判断读写：命中即拒，未命中放行只读。"未命中"不等于"确认是读操作"，但误判后果被限制为多/少一次只读查询。
+
+### 写操作确认
+
+- 确认词**精确匹配**：`"确认不了"` 不算确认
+- 执行前**始终重新校验**订单状态，不管 pending 是否过期
+- 用户未说金额时按订单全额退款，金额取自库而非前端快照
+
+### 会话存储
+
+Redis，`session:{id}` TTL 24h，待确认操作单独存 `agent:pending:{id}`，TTL 5 分钟。
+
+### 测试
+
+```
+tests/unit/          80 个：意图解析、降级词表、确认、呈现、会话、桩
+tests/contract/      15 个：mock 服务接口契约
+tests/integration/   62 个：端到端流程、降级、trace 贯穿、会话恢复、并发幂等
+```
+
+重点用例：
+- `test_hints_do_not_change_outcome` — 关键词不参与决策
+- `test_every_request_retries_llm` — 上次失败不影响下次调用
+- `test_degraded_blocks_refund` — 降级期零写操作
+- `test_containing_confirmation_word_is_rejected` — "确认不了"不触发执行
+- `test_trace_propagates_to_mock` — trace 贯穿两个服务

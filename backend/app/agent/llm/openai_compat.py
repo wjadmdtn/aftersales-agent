@@ -1,0 +1,98 @@
+"""T007: 真实 LLM 客户端（OpenAI 兼容接口）。
+
+关键词以提示形式随请求发出，但最终判断由模型完成。
+"""
+from __future__ import annotations
+
+import json
+from typing import Any
+
+import httpx
+
+from app.agent.llm.base import LLMError
+from app.config import settings
+from app.models.agent import Intent, IntentResult
+
+_SYSTEM_PROMPT = """你是客服意图识别器。判断用户**真实诉求**，只输出 JSON。
+
+意图只能是：refund(发起退款) / logistics(查物流) / change_address(改地址) /
+query_order(查订单) / complaint(投诉) / manual(要人工) / general(其他)
+
+**关键**：同样的词在不同语境下含义相反。必须区分：
+- 诉求：用户希望系统为他执行某个操作
+- 威胁："再不处理我就投诉你们不肯退款" —— 是投诉施压，不是要退款
+- 咨询："这个能退款吗" —— 是问可行性，不是要退
+- 历史："上次退款拖了半个月" —— 是抱怨过去，不是新诉求
+- 反向："别再发退款短信了" —— 不是要退款
+- 转述："我朋友说能退货" —— 不是他自己要退
+
+输出格式：{"intent": "...", "confidence": 0.0-1.0, "reason": "简短依据"}"""
+
+
+class OpenAICompatLLMClient:
+    def __init__(
+        self,
+        base_url: str | None = None,
+        api_key: str | None = None,
+        model: str | None = None,
+        timeout_ms: int | None = None,
+    ):
+        self.base_url = (base_url or settings.llm_base_url).rstrip("/")
+        self.api_key = api_key or settings.llm_api_key
+        self.model = model or settings.llm_model
+        self.timeout_ms = timeout_ms or settings.llm_timeout_ms
+        if not self.base_url or not self.model:
+            raise ValueError("LLM base_url and model must be configured")
+
+    async def classify(
+        self,
+        *,
+        user_input: str,
+        hint_keywords: list[str],
+        context: dict[str, Any],
+    ) -> IntentResult:
+        hint_block = ""
+        if hint_keywords:
+            hint_block = (
+                f"\n\n（辅助提示：文本中出现这些词：{', '.join(hint_keywords)}。"
+                f"注意它们可能出现在威胁、否定、咨询、历史陈述或转述中，"
+                f"不能据此直接判定诉求。）"
+            )
+        ctx_block = ""
+        if context:
+            ctx_block = f"\n\n会话上下文：{json.dumps(context, ensure_ascii=False)}"
+
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "user", "content": user_input + hint_block + ctx_block},
+            ],
+            "temperature": 0,
+            "response_format": {"type": "json_object"},
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout_ms / 1000) as client:
+                resp = await client.post(
+                    f"{self.base_url}/chat/completions",
+                    json=payload,
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                )
+                resp.raise_for_status()
+                content = resp.json()["choices"][0]["message"]["content"]
+        except (httpx.HTTPError, KeyError, IndexError) as e:
+            raise LLMError(f"llm call failed: {e}") from e
+
+        try:
+            data = json.loads(content)
+            intent = Intent(data["intent"])
+            confidence = float(data.get("confidence", 0.5))
+        except (json.JSONDecodeError, KeyError, ValueError) as e:
+            raise LLMError(f"llm returned invalid structure: {e}") from e
+
+        return IntentResult(
+            intent=intent,
+            confidence=max(0.0, min(1.0, confidence)),
+            reason=data.get("reason"),
+        )

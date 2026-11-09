@@ -22,6 +22,10 @@ def create_app() -> FastAPI:
 
     app.include_router(router)
 
+    from app.api.agent_routes import router as agent_router
+
+    app.include_router(agent_router)
+
     return app
 
 
