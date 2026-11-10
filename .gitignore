@@ -18,6 +18,14 @@ __pycache__/
 
 # Backend
 backend/openapi.json
+backend/app/static/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
+frontend/.vite/
 
 # Eval reports（可重新生成，不入库）
 eval/report/

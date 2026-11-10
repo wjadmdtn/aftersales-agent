@@ -71,6 +71,34 @@ class Settings(BaseSettings):
     rag_embedder: str = "stub"
     rag_embedding_dim: int = Field(default=1024, ge=8)
 
+    # --- web ui / chat realtime (feature 006) ---
+    ws_heartbeat_interval_s: int = Field(default=20, gt=0)
+    ws_idle_timeout_s: int = Field(default=60, gt=0)
+    ws_reconnect_base_s: float = Field(default=1.0, gt=0)
+    ws_reconnect_max_s: float = Field(default=30.0, gt=0)
+    ws_inbound_rate_limit: int = Field(default=10, ge=1)
+    ws_inbound_rate_window_s: int = Field(default=5, gt=0)
+    # 与 session_ttl_seconds 同寿命：会话过期后消息不应比会话活得更久
+    chat_message_ttl_seconds: int = Field(default=86400, gt=0)
+    chat_backfill_max_messages: int = Field(default=200, ge=1)
+    frontend_static_dir: str = "app/static"
+    # 演示账号：不做账号体系，人工端固定身份
+    demo_agent_id: str = "demo-agent"
+    demo_agent_name: str = "小王"
+    # 无 LLM 配置时用桩，需预先登记演示用句子，否则全部走澄清
+    demo_stub_responses_raw: str = Field(
+        default="""{
+  "我要退款": {"intent": "refund", "mode": "execute"},
+  "我要投诉": {"intent": "complaint", "mode": "execute"},
+  "转人工": {"intent": "manual", "mode": "execute"},
+  "我的订单到哪了": {"intent": "logistics", "mode": "execute"},
+  "快递到哪了": {"intent": "logistics", "mode": "execute"},
+  "订单状态": {"intent": "query_order", "mode": "execute"},
+  "这个能退款吗": {"intent": "refund", "mode": "inquiry"},
+  "退款到哪了": {"intent": "refund", "mode": "query"}
+}"""
+    )
+
     handoff_scripts_raw: str = Field(
         default="""{
   "user_request": "好的，正在为您接入人工客服，请稍候。",
@@ -84,10 +112,23 @@ class Settings(BaseSettings):
     )
 
     @field_validator("risk_keywords_raw", "user_request_keywords_raw", "angry_keywords_raw",
-                     "negative_keywords_raw", "handoff_scripts_raw")
+                     "negative_keywords_raw", "handoff_scripts_raw",
+                     "demo_stub_responses_raw")
     @classmethod
     def _validate_json_handoff(cls, v: str) -> str:
         json.loads(v)
+        return v
+
+    @property
+    def demo_stub_responses(self) -> dict[str, dict[str, str]]:
+        return json.loads(self.demo_stub_responses_raw)
+
+    @field_validator("ws_reconnect_max_s")
+    @classmethod
+    def _reconnect_max_ge_base(cls, v: float, info) -> float:
+        base = info.data.get("ws_reconnect_base_s")
+        if base is not None and v < base:
+            raise ValueError("ws_reconnect_max_s 必须 >= ws_reconnect_base_s")
         return v
 
     @property
