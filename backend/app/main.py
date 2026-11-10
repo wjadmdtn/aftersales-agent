@@ -87,6 +87,25 @@ def _policy_llm():
     return OpenAICompatLLMClient()
 
 
+async def _on_handoff(session_id: str, outcome_state) -> None:
+    """Agent 内部触发转人工后，把状态同步到 ChatState 并广播。
+
+    此前只有"快捷转人工"走广播，走 AgentLoop 的意图转人工（投诉等）
+    用户端看不到状态变化——这是真实缺陷，不只是测试问题。
+    """
+    from app.chat.broadcast import broadcast_queue_update, broadcast_state
+    from app.chat.runtime import get_chat
+
+    rt = get_chat()
+    try:
+        await rt.registry.set_state(session_id, outcome_state)
+    except KeyError:
+        await rt.registry.ensure(session_id, user_id="unknown")
+        await rt.registry.set_state(session_id, outcome_state)
+    await broadcast_state(session_id)
+    await broadcast_queue_update(added=[session_id])
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from app.agent.intent import IntentClassifier
@@ -112,6 +131,7 @@ async def lifespan(app: FastAPI):
         tools=MockServiceClient(settings.mock_service_base_url),
         coordinator=coordinator,
         policy=_build_policy(redis),
+        on_handoff=_on_handoff,
     )
     handoff_routes.configure_handoff(coordinator)
 
@@ -172,10 +192,15 @@ def create_app() -> FastAPI:
 
 
 def _mount_static(app: FastAPI) -> None:
-    """前端构建产物存在才挂载（FR-022：后端不依赖前端构建即可启动）。"""
-    dist = Path(settings.frontend_static_dir)
-    if not dist.is_absolute():
-        dist = Path(__file__).resolve().parent / "static"
+    """前端构建产物存在才挂载（FR-022：后端不依赖前端构建即可启动）。
+
+    默认配置 `app/static` 是相对 backend 根目录的，因此按 app 包父目录解析；
+    绝对路径原样使用。找不到就只是不挂载，不猜别的位置。
+    """
+    configured = Path(settings.frontend_static_dir)
+    dist = configured if configured.is_absolute() else (
+        Path(__file__).resolve().parent.parent / configured
+    )
     if dist.is_dir() and (dist / "index.html").exists():
         app.mount("/", StaticFiles(directory=str(dist), html=True), name="ui")
         logger.info("static ui mounted from %s", dist)

@@ -51,6 +51,7 @@ def configure_agent(
     tools: MockServiceClient,
     coordinator=None,
     policy=None,
+    on_handoff=None,
 ) -> None:
     global _loop
     _loop = AgentLoop(
@@ -59,6 +60,7 @@ def configure_agent(
         tools=tools,
         coordinator=coordinator,
         policy=policy,
+        on_handoff=on_handoff,
     )
 
 

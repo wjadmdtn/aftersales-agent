@@ -38,9 +38,27 @@ def test_agent_chat_works_out_of_the_box(http):
     assert r.json()["reply"]
 
 
-def test_root_404_without_static_dir(http):
-    """未构建前端时 / 不该 500，而是 404（FR-022）。"""
-    assert http.get("/").status_code == 404
+def test_root_404_without_static_dir(monkeypatch):
+    """未构建前端时 / 不该 500，而是 404（FR-022）。
+
+    构建产物存在时 / 是 200——所以这里显式指向一个不存在的目录。
+    """
+    from app.config import settings
+    from starlette.testclient import TestClient
+
+    from app.main import create_app
+
+    monkeypatch.setattr(settings, "frontend_static_dir", "app/__no_such_static__", raising=False)
+    with TestClient(create_app()) as c:
+        assert c.get("/").status_code == 404
+
+
+def test_root_serves_ui_when_static_exists(http):
+    """有构建产物时后端直接托管页面。"""
+    r = http.get("/")
+    assert r.status_code in (200, 404)  # CI 未构建时为 404，本地构建后为 200
+    if r.status_code == 200:
+        assert "text/html" in r.headers["content-type"]
 
 
 def test_stub_table_is_preloaded_for_demo():

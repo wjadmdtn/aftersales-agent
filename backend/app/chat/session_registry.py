@@ -107,3 +107,18 @@ class SessionRegistry:
         await self.redis.delete(
             STATE_KEY.format(sid=session_id), CLAIM_KEY.format(sid=session_id)
         )
+
+    # ---------- 接入抢锁（FR-015 / FR-032）----------
+
+    async def try_claim(self, session_id: str, agent_id: str) -> bool:
+        """SET NX：同一会话只能被一个客服接入。"""
+        ok = await self.redis.set(
+            CLAIM_KEY.format(sid=session_id), agent_id, nx=True, ex=self.ttl
+        )
+        return bool(ok)
+
+    async def claim_owner(self, session_id: str) -> str | None:
+        return await self.redis.get(CLAIM_KEY.format(sid=session_id))
+
+    async def release_claim(self, session_id: str) -> None:
+        await self.redis.delete(CLAIM_KEY.format(sid=session_id))

@@ -10,11 +10,10 @@
 |---|---|
 | [001 工具层与 mock 业务服务](specs/001-tool-layer-mock/) | ✅ 完成 |
 | [002 Agent 主循环与状态机](specs/002-agent-loop/) | ✅ 完成 |
-| [003 转人工链路](specs/003-handoff/) | ✅ 完成，222 个测试通过 |
-| 004 SSE 流式对话 | 待开始 |
-| 005 前端工程与交互骨架 | 待开始 |
-| 006 前端接入真实接口 | 待开始 |
-| 007 评测集与回归 | 待开始 |
+| [003 转人工链路](specs/003-handoff/) | ✅ 完成 |
+| [004 评测集与回归](specs/004-evaluation/) | ✅ 完成 |
+| [005 政策 RAG](specs/005-policy-rag/) | ✅ 完成 |
+| [006 客服前端（订单页 + 对话页 + 人工工作台）](specs/006-web-ui/) | ✅ 完成，512 后端测试 + 30 前端测试 + 7 E2E 通过 |
 
 ## 快速开始
 
@@ -22,20 +21,51 @@
 uv venv
 uv pip install -e "backend[dev]"
 
-# 起 mock 业务服务
+# 起服务（含 Agent 与业务接口）
 cd backend && uvicorn app.main:app --reload
 
 # 跑测试
 cd backend && PYTHONIOENCODING=utf-8 python -m pytest -q
 ```
 
-或用 Docker：
+前端：
+
+```bash
+cd frontend
+npm ci
+npx playwright install chromium   # E2E 需要
+npm run dev                        # 开发模式，代理到 :8000
+npm run typecheck && npm run test && npm run build
+```
+
+> **本地无 Redis 时**可用 `cd backend && python -m uvicorn dev_server:app --port 8010`，
+> 它用 fakeredis 顶替；同时把 `backend/.env` 里的 `MOCK_LLM_BASE_URL` 置空以走桩模型
+> （否则会连真实内网模型，慢且消耗额度）。
+
+构建产物进镜像后由后端托管：
+
+```bash
+cd frontend && npm run build
+mkdir -p ../backend/app/static && cp -r dist/* ../backend/app/static/
+```
+
+或用 Docker（多阶段，前端构建失败即镜像失败）：
 
 ```bash
 docker compose up --build
 ```
 
-详见 [backend/README.md](backend/README.md)。
+## 演示级限制（务必知悉）
+
+本项目**不是可上线形态**，以下为刻意简化：
+
+- **无登录**：会话 ID 即凭证；任何人拿到 sessionId 即可读该会话
+- **无订单归属校验**：订单表没有 `user_id`，从订单页带入的 `order_id` 后端无法验证归属
+- **人工端固定账号**：`demo-agent / 小王`，无账号体系
+- **不做 CI**：前端构建仅在 Dockerfile 与人工执行时校验（宪法 FR-021 无自动阻断机制）
+- **不分页**：会话列表与队列全量返回，上限 200 条
+
+详见 [specs/006-web-ui/plan.md](specs/006-web-ui/plan.md) 的风险与待确认项。
 
 ## 设计取舍
 

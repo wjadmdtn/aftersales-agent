@@ -60,14 +60,14 @@ function handleFrame(env: Envelope<any>) {
       applyState(env.payload)
       break
     case 'user.message.ack': {
-      const localId = env.payload.local_id
-      if (localId && localId === lastLocalId) {
-        // 乐观上屏的那条换成服务端版本
-        messages.value = messages.value.filter((m) => !m.id.startsWith('local:'))
-        lastLocalId = null
-      }
+      const localId = env.payload.local_id as string | undefined
       const msg = env.payload.message as ChatMessage
-      messages.value = mergeMessages(messages.value, [msg]).messages
+      // 用服务端版本替换乐观上屏那条：按 local id 精确剔除，避免留下重复消息
+      const cleaned = localId
+        ? messages.value.filter((m) => m.id !== localId)
+        : messages.value
+      messages.value = mergeMessages(cleaned, [msg]).messages
+      if (localId === lastLocalId) lastLocalId = null
       break
     }
     case 'assistant.delta': {

@@ -6,6 +6,8 @@ requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn>=0.32",
+    # uvicorn 不带 WebSocket 实现，缺失时 /ws/* 全部 404（006 实时通道依赖）
+    "websockets>=13.0",
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
     "redis>=5.2",

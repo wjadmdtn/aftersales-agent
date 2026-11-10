@@ -67,12 +67,15 @@ class AgentLoop:
         tools: MockServiceClient,
         coordinator=None,
         policy=None,
+        on_handoff=None,
     ):
         self.classifier = classifier
         self.sessions = sessions
         self.tools = tools
         self.coordinator = coordinator
         self.policy = policy
+        # 转人工成功后的旁路通知（写 ChatState + 广播），不改变Agent 的返回值语义
+        self.on_handoff = on_handoff
 
     async def handle(
         self,
@@ -314,6 +317,10 @@ class AgentLoop:
             trigger=trigger,
             order_id=state.order_id,
         )
+        # 状态变化必须送到界面，否则用户端会一直显示"AI 助手"而实际已在排队。
+        # 默认 no-op，避免 003~005 的既有测试被牵连。
+        if self.on_handoff is not None:
+            await self.on_handoff(state.session_id, outcome.state)
         return AgentReply(
             reply=outcome.reply,
             intent=Intent.MANUAL if primary_intent == "manual" else Intent.COMPLAINT,
