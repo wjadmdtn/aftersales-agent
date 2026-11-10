@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
 
+from app.chat.protocol import UI_STATE_OF
 from app.chat.runtime import get_chat
 
 router = APIRouter(prefix="/chat")
@@ -27,8 +28,10 @@ async def get_session(
         session_id, after_seq=after_seq, limit=limit or 200
     )
     state = await rt.registry.touch_seq(session_id, page.last_seq)
+    state_dump = state.model_dump(mode="json")
+    state_dump["ui_state"] = UI_STATE_OF[state.state]
     return {
-        "state": state.model_dump(mode="json"),
+        "state": state_dump,
         "messages": [m.model_dump(mode="json") for m in page.messages],
         "last_seq": page.last_seq,
         "truncated": page.truncated,

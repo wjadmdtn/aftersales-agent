@@ -76,6 +76,57 @@ def http(prod_app):
         yield client
 
 
+class _WsRegistry:
+    """收集测试里开的 WS，用例结束统一关闭，否则 TestClient 退出会挂死。"""
+
+    def __init__(self):
+        self.open = []
+
+    def track(self, ws):
+        self.open.append(ws)
+
+    def close_all(self):
+        while self.open:
+            ws = self.open.pop()
+            try:
+                ws.__exit__(None, None, None)
+            except Exception:
+                pass
+
+
+@pytest.fixture
+def ws_registry():
+    reg = _WsRegistry()
+    yield reg
+    reg.close_all()
+
+
+@pytest.fixture
+def ws_user(http, ws_registry):
+    """用户端连接。用法：ws_user(session_id="s1", user_id="u1", order_id="ORD1002")"""
+
+    def _open(session_id: str = "s1", user_id: str = "u1", order_id: str | None = None):
+        params = {"session_id": session_id, "user_id": user_id}
+        if order_id:
+            params["order_id"] = order_id
+        qs = "&".join(f"{k}={v}" for k, v in params.items())
+        ctx = http.websocket_connect("/ws/chat?" + qs)
+        ws_registry.track(ctx)
+        return WsClient(ctx.__enter__())
+
+    return _open
+
+
+@pytest.fixture
+def ws_agent(http, ws_registry):
+    def _open(agent_id: str = "demo-agent"):
+        ctx = http.websocket_connect(f"/ws/agent?agent_id={agent_id}")
+        ws_registry.track(ctx)
+        return WsClient(ctx.__enter__())
+
+    return _open
+
+
 class WsClient:
     """同步测试客户端的 WebSocket 包装，提供 collect_until 便于断言序列。"""
 
@@ -107,31 +158,6 @@ class WsClient:
             except Exception:
                 break
         return out
-
-
-@pytest.fixture
-def ws_user(http):
-    """用户端连接。用法：ws_user(session_id="s1", user_id="u1", order_id="ORD1002")"""
-
-    def _open(session_id: str = "s1", user_id: str = "u1", order_id: str | None = None):
-        params = {"session_id": session_id, "user_id": user_id}
-        if order_id:
-            params["order_id"] = order_id
-        ws = http.websocket_connect("/ws/chat?" + "&".join(f"{k}={v}" for k, v in params.items()))
-        ctx = ws.__enter__()
-        return WsClient(ctx)
-
-    return _open
-
-
-@pytest.fixture
-def ws_agent(http):
-    def _open(agent_id: str = "demo-agent"):
-        ws = http.websocket_connect(f"/ws/agent?agent_id={agent_id}")
-        ctx = ws.__enter__()
-        return WsClient(ctx)
-
-    return _open
 
 
 async def in_thread(fn, *args, **kwargs):
