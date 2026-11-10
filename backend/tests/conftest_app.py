@@ -17,8 +17,9 @@ import pytest
 from starlette.testclient import TestClient
 
 import app.api.routes as mock_routes
-from app.api import agent_routes, chat_routes, handoff_routes
+from app.api import agent_routes, handoff_routes
 from app.chat import redis as chat_redis
+from app.chat.runtime import reset_chat
 from app.main import create_app
 
 
@@ -43,21 +44,35 @@ def fake_redis_for_prod(monkeypatch):
 
 @pytest.fixture
 def prod_app(monkeypatch, fake_redis_for_prod):
-    """重置 mock store 并返回未启动的 app。"""
+    """重置 mock store 并返回未启动的 app。
+
+    强制走 stub：本地 .env 可能指向真实内网 LLM，测试绝不能打到它。
+    业务接口走 in-process：Agent 与 mock 服务在同一个 app 里。
+    """
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "llm_base_url", "", raising=False)
+    monkeypatch.setattr(settings, "policy_enabled", False, raising=False)
     mock_routes.reset_store()
     agent_routes._loop = None
     handoff_routes._coordinator = None
-    chat_routes.reset_chat()
+    reset_chat()
     app = create_app()
     yield app
     agent_routes._loop = None
     handoff_routes._coordinator = None
-    chat_routes.reset_chat()
+    reset_chat()
 
 
 @pytest.fixture
 def http(prod_app):
     with TestClient(prod_app) as client:
+        # 业务接口 in-process：TestClient 不监听网络端口，tools 必须换掉
+        from app.api.agent_routes import _loop
+        from tests.conftest_agent import InProcessMockClient
+
+        if _loop is not None:
+            _loop.tools = InProcessMockClient(prod_app)
         yield client
 
 
@@ -126,9 +141,9 @@ async def in_thread(fn, *args, **kwargs):
 
 @pytest.fixture(autouse=True)
 def _reset_chat_state():
-    chat_routes.reset_chat()
+    reset_chat()
     yield
-    chat_routes.reset_chat()
+    reset_chat()
 
 
 def run_sync(coro):
