@@ -1,0 +1,103 @@
+{
+  "backend": "stub",
+  "model": null,
+  "case_count": 220,
+  "metrics": [
+    {
+      "name": "业务动作准确率",
+      "value": 0.5429,
+      "passed": 57,
+      "total": 105,
+      "baseline": null,
+      "delta": null
+    },
+    {
+      "name": "业务动作-standard",
+      "value": 0.7455,
+      "passed": 41,
+      "total": 55,
+      "baseline": null,
+      "delta": null
+    },
+    {
+      "name": "业务动作-adversarial",
+      "value": 0.4667,
+      "passed": 14,
+      "total": 30,
+      "baseline": null,
+      "delta": null
+    },
+    {
+      "name": "业务动作-no_keyword",
+      "value": 0.1,
+      "passed": 2,
+      "total": 20,
+      "baseline": null,
+      "delta": null
+    },
+    {
+      "name": "澄清正确率",
+      "value": 0.725,
+      "passed": 29,
+      "total": 40,
+      "baseline": null,
+      "delta": null
+    },
+    {
+      "name": "无关输入正确率",
+      "value": 1.0,
+      "passed": 20,
+      "total": 20,
+      "baseline": null,
+      "delta": null
+    },
+    {
+      "name": "转人工正确率",
+      "value": 0.7333,
+      "passed": 22,
+      "total": 30,
+      "baseline": null,
+      "delta": null
+    },
+    {
+      "name": "端到端成功率",
+      "value": 0.96,
+      "passed": 24,
+      "total": 25,
+      "baseline": null,
+      "delta": null
+    },
+    {
+      "name": "意图识别总体",
+      "value": 0.6564,
+      "passed": 128,
+      "total": 195,
+      "baseline": null,
+      "delta": null
+    },
+    {
+      "name": "过度转接率",
+      "value": 0.025,
+      "passed": 1,
+      "total": 40,
+      "baseline": null,
+      "delta": null
+    },
+    {
+      "name": "转人工漏转率",
+      "value": 0.2667,
+      "passed": 8,
+      "total": 30,
+      "baseline": null,
+      "delta": null
+    },
+    {
+      "name": "话术承诺泄露",
+      "value": 0.0,
+      "passed": null,
+      "total": 220,
+      "baseline": null,
+      "delta": null
+    }
+  ]
+}

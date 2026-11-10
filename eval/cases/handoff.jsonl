@@ -1,0 +1,30 @@
+{"id":"handoff-req-00","category":"handoff","path":"handoff","input":"转人工","context":{"order_id":"ORD1002"},"expect":{"triggered":true,"trigger_type":"user_request","priority":"medium"}}
+{"id":"handoff-req-01","category":"handoff","path":"handoff","input":"我要找人工客服","context":{"order_id":"ORD1002"},"expect":{"triggered":true,"trigger_type":"user_request","priority":"medium"}}
+{"id":"handoff-req-02","category":"handoff","path":"handoff","input":"人工","context":{"order_id":"ORD1002"},"expect":{"triggered":true,"trigger_type":"user_request","priority":"medium"}}
+{"id":"handoff-req-03","category":"handoff","path":"handoff","input":"找真人","context":{"order_id":"ORD1002"},"expect":{"triggered":true,"trigger_type":"user_request","priority":"medium"}}
+{"id":"handoff-req-04","category":"handoff","path":"handoff","input":"能不能叫人","context":{"order_id":"ORD1002"},"expect":{"triggered":true,"trigger_type":"user_request","priority":"medium"}}
+{"id":"handoff-req-05","category":"handoff","path":"handoff","input":"我要客服电话","context":{"order_id":"ORD1002"},"expect":{"triggered":true,"trigger_type":"user_request","priority":"medium"}}
+{"id":"handoff-req-06","category":"handoff","path":"handoff","input":"找你们客服","context":{"order_id":"ORD1002"},"expect":{"triggered":true,"trigger_type":"user_request","priority":"medium"}}
+{"id":"handoff-req-07","category":"handoff","path":"handoff","input":"换个人跟我说","context":{"order_id":"ORD1002"},"expect":{"triggered":true,"trigger_type":"user_request","priority":"medium"}}
+{"id":"handoff-risk-00","category":"handoff","path":"handoff","input":"我要投诉你们","context":{"order_id":"ORD1002"},"expect":{"triggered":true,"trigger_type":"risk","priority":"high"}}
+{"id":"handoff-risk-01","category":"handoff","path":"handoff","input":"你们这是欺诈","context":{"order_id":"ORD1002"},"expect":{"triggered":true,"trigger_type":"risk","priority":"high"}}
+{"id":"handoff-risk-02","category":"handoff","path":"handoff","input":"我要去消协投诉","context":{"order_id":"ORD1002"},"expect":{"triggered":true,"trigger_type":"risk","priority":"high"}}
+{"id":"handoff-risk-03","category":"handoff","path":"handoff","input":"再不处理我就打12315","context":{"order_id":"ORD1002"},"expect":{"triggered":true,"trigger_type":"risk","priority":"high"}}
+{"id":"handoff-risk-04","category":"handoff","path":"handoff","input":"我要曝光你们","context":{"order_id":"ORD1002"},"expect":{"triggered":true,"trigger_type":"risk","priority":"high"}}
+{"id":"handoff-risk-05","category":"handoff","path":"handoff","input":"这是骗子吧","context":{"order_id":"ORD1002"},"expect":{"triggered":true,"trigger_type":"risk","priority":"high"}}
+{"id":"handoff-risk-06","category":"handoff","path":"handoff","input":"垃圾东西","context":{"order_id":"ORD1002"},"expect":{"triggered":true,"trigger_type":"risk","priority":"high"}}
+{"id":"handoff-risk-07","category":"handoff","path":"handoff","input":"你们太差劲了","context":{"order_id":"ORD1002"},"expect":{"triggered":true,"trigger_type":"risk","priority":"high"}}
+{"id":"handoff-risk-08","category":"handoff","path":"handoff","input":"我要给差评","context":{"order_id":"ORD1002"},"expect":{"triggered":true,"trigger_type":"risk","priority":"high"}}
+{"id":"handoff-risk-09","category":"handoff","path":"handoff","input":"必须给我个说法","context":{"order_id":"ORD1002"},"expect":{"triggered":true,"trigger_type":"risk","priority":"high"}}
+{"id":"handoff-risk-10","category":"handoff","path":"handoff","input":"我起诉你们","context":{"order_id":"ORD1002"},"expect":{"triggered":true,"trigger_type":"risk","priority":"high"}}
+{"id":"handoff-risk-11","category":"handoff","path":"handoff","input":"举报你们","context":{"order_id":"ORD1002"},"expect":{"triggered":true,"trigger_type":"risk","priority":"high"}}
+{"id":"handoff-sys-00","category":"handoff","path":"handoff","input":"订单查不出来，一直报错","context":{"order_id":"ORD1002","tool_failure_streak":3},"expect":{"triggered":true,"trigger_type":"system_error","priority":"low"}}
+{"id":"handoff-sys-01","category":"handoff","path":"handoff","input":"提交了好几次都没反应","context":{"order_id":"ORD1002","tool_failure_streak":4},"expect":{"triggered":true,"trigger_type":"system_error","priority":"low"}}
+{"id":"handoff-sys-02","category":"handoff","path":"handoff","input":"一直转圈","context":{"order_id":"ORD1002","tool_failure_streak":3},"expect":{"triggered":true,"trigger_type":"system_error","priority":"low"}}
+{"id":"handoff-sys-03","category":"handoff","path":"handoff","input":"页面打不开","context":{"order_id":"ORD1002","tool_failure_streak":5},"expect":{"triggered":true,"trigger_type":"system_error","priority":"low"}}
+{"id":"handoff-sys-04","category":"handoff","path":"handoff","input":"系统又崩了吗","context":{"order_id":"ORD1002","tool_failure_streak":3},"expect":{"triggered":true,"trigger_type":"system_error","priority":"low"}}
+{"id":"handoff-bnd-00","category":"handoff","path":"handoff","input":"我查一下 ORD999999","context":{"order_id":"ORD1002","last_tool_status":"NOT_FOUND"},"expect":{"triggered":true,"trigger_type":"boundary","priority":"low"}}
+{"id":"handoff-bnd-01","category":"handoff","path":"handoff","input":"查下这个订单 ORD888888","context":{"order_id":"ORD1002","last_tool_status":"NOT_FOUND"},"expect":{"triggered":true,"trigger_type":"boundary","priority":"low"}}
+{"id":"handoff-bnd-02","category":"handoff","path":"handoff","input":"看看物流","context":{"order_id":"ORD1002","last_tool_status":"EMPTY"},"expect":{"triggered":true,"trigger_type":"boundary","priority":"low"}}
+{"id":"handoff-bnd-03","category":"handoff","path":"handoff","input":"我的包裹呢","context":{"order_id":"ORD1002","last_tool_status":"EMPTY"},"expect":{"triggered":true,"trigger_type":"boundary","priority":"low"}}
+{"id":"handoff-bnd-04","category":"handoff","path":"handoff","input":"帮我查个单子","context":{"order_id":"ORD1002","last_tool_status":"NOT_FOUND"},"expect":{"triggered":true,"trigger_type":"boundary","priority":"low"}}
