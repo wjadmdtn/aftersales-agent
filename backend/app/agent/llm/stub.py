@@ -9,6 +9,7 @@ from typing import Any, Callable, Literal
 
 from app.agent.llm.base import LLMError
 from app.models.agent import Intent, IntentResult
+from app.policy.models import PolicyAnswer, RetrievalDecision, RetrievalResult
 
 FailMode = Literal["timeout", "error", "invalid"] | None
 
@@ -23,6 +24,8 @@ class StubLLMClient:
         fail_times: int = 0,
         delay_ms: int = 0,
         classifier: Callable[[str], IntentResult] | None = None,
+        policy_responses: dict[str, PolicyAnswer] | None = None,
+        policy_default: PolicyAnswer | None = None,
     ):
         self.responses = responses or {}
         self.default = default or IntentResult(intent=Intent.GENERAL, confidence=0.5)
@@ -30,7 +33,10 @@ class StubLLMClient:
         self.fail_times = fail_times
         self.delay_ms = delay_ms
         self.classifier = classifier
+        self.policy_responses = policy_responses or {}
+        self.policy_default = policy_default
         self.call_count = 0
+        self.policy_call_count = 0
         self.last_hints: list[str] = []
 
     async def classify(
@@ -59,3 +65,31 @@ class StubLLMClient:
         if self.classifier is not None:
             return self.classifier(user_input)
         return self.responses.get(user_input, self.default)
+
+    async def answer_policy(
+        self, *, user_input: str, retrieval: RetrievalResult
+    ) -> PolicyAnswer:
+        self.policy_call_count += 1
+
+        if self.delay_ms:
+            await asyncio.sleep(self.delay_ms / 1000)
+
+        if self.fail_mode is not None:
+            raise LLMError("llm unavailable (stub, policy)")
+
+        if user_input in self.policy_responses:
+            return self.policy_responses[user_input]
+
+        if self.policy_default is not None:
+            return self.policy_default
+
+        # 默认行为：引用 top1、把它的例外全部当作已处理
+        top = retrieval.candidates[0].clause if retrieval.candidates else None
+        if top is None:
+            return PolicyAnswer(decision=RetrievalDecision.MISS)
+        return PolicyAnswer(
+            decision=retrieval.decision,
+            answer=f"根据《{top.title}》：{top.body}",
+            cited_clause_ids=[top.clause_id],
+            handled_exceptions=list(top.exceptions),
+        )

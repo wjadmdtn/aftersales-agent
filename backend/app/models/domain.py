@@ -25,6 +25,8 @@ class Order(BaseModel):
     status: OrderStatus
     amount: Decimal = Field(gt=0)
     address: Address
+    # 政策检索的品类过滤依据；缺失时只匹配通配条款，不用品类不明的条款强行回答
+    product_type: str | None = None
     created_at: datetime = Field(default_factory=_now)
     updated_at: datetime = Field(default_factory=_now)
 

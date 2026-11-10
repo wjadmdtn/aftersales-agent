@@ -1,0 +1,399 @@
+[
+  {
+    "clause_id": "REFUND-COMMON-01",
+    "policy_id": "REFUND-COMMON",
+    "version": 3,
+    "effective_from": "2026-01-01",
+    "effective_to": null,
+    "category": "refund",
+    "title": "退款到账时间",
+    "body": "退款审核通过后，款项按原支付方式退回。余额/平台账户实时到账；支付宝/微信支付1~3个工作日；银行卡（含信用卡）3~7个工作日，具体以发卡行处理时间为准；花呗/分期1~7个工作日，已产生的分期手续费按支付渠道规则处理。",
+    "exceptions": [
+      "遇法定节假日顺延",
+      "跨境订单以清关及境外银行处理时效为准，最长15个工作日"
+    ],
+    "applies_to": {"product_types": ["*"], "scenes": []}
+  },
+  {
+    "clause_id": "REFUND-COMMON-02",
+    "policy_id": "REFUND-COMMON",
+    "version": 3,
+    "effective_from": "2026-01-01",
+    "effective_to": null,
+    "category": "refund",
+    "title": "退款金额的计算口径",
+    "body": "退款金额以实付金额为准。使用优惠券、满减、红包的部分，按购买时各商品价格占比分摊后结算，多退少补。",
+    "exceptions": [
+      "套装或多商品订单部分退货导致不再满足满减条件的，需重新按原价结算剩余商品，差额从退款中扣除",
+      "积分/代金券/优惠券支付的，以相应形式返还（不退现金），有约定的从其约定",
+      "使用信用卡且已被收取手续费的，退款时不退还手续费"
+    ],
+    "applies_to": {"product_types": ["*"], "scenes": []}
+  },
+  {
+    "clause_id": "REFUND-COMMON-03",
+    "policy_id": "REFUND-COMMON",
+    "version": 3,
+    "effective_from": "2026-01-01",
+    "effective_to": null,
+    "category": "refund",
+    "title": "退款运费是否退回",
+    "body": "商品质量问题、商家责任、发错货：退货运费由商家承担，原订单运费全额退回。七天无理由等非质量原因：运费依法由消费者承担，原订单运费不退回。已参加满X元包邮但因退货不再达标的，退款时按规则扣除原运费。",
+    "exceptions": [
+      "若商品含运费险且理赔成功，由保险公司赔付退货运费，与商家退款相互独立"
+    ],
+    "applies_to": {"product_types": ["*"], "scenes": ["quality_issue", "no_reason_return"]}
+  },
+  {
+    "clause_id": "REFUND-COMMON-04",
+    "policy_id": "REFUND-COMMON",
+    "version": 3,
+    "effective_from": "2026-01-01",
+    "effective_to": null,
+    "category": "refund",
+    "title": "商家超时未处理的退款",
+    "body": "未发货订单申请退款，商家48小时内未处理，系统自动退款。已发货订单申请退款，商家需在5日内响应；超时未响应，平台介入处理。经营者自收到退货要求之日起超过15日未办理退货手续的，属违规行为。",
+    "exceptions": ["商家已举证商品已发出或存在争议时，转为平台仲裁流程"],
+    "applies_to": {"product_types": ["*"], "scenes": ["unshipped", "shipped"]}
+  },
+
+  {
+    "clause_id": "RETURN-SEVENDAY-01",
+    "policy_id": "RETURN-SEVENDAY",
+    "version": 3,
+    "effective_from": "2026-01-01",
+    "effective_to": null,
+    "category": "return",
+    "title": "七天无理由退货的适用范围",
+    "body": "通过本平台网络购买的商品，消费者自签收次日起7个自然日（168小时）内，可无需说明理由申请退货。期间起算：签收次日0点起算，第7日24点截止。无需说明理由，但商品应保持完好。商家自行标注不支持七天无理由不当然生效，需符合法定或约定条件并经消费者购买时确认。",
+    "exceptions": [
+      "商品不完好（见完好标准）不支持",
+      "拆封后无法恢复原状的数字化商品不支持",
+      "定制、鲜活易腐等法定除外商品不支持"
+    ],
+    "applies_to": {"product_types": ["*"], "scenes": []}
+  },
+  {
+    "clause_id": "RETURN-SEVENDAY-02",
+    "policy_id": "RETURN-SEVENDAY",
+    "version": 3,
+    "effective_from": "2026-01-01",
+    "effective_to": "2026-11-30",
+    "category": "return",
+    "title": "七天无理由的时效起算与超期处理",
+    "body": "时效以物流签收时间为准，签收次日起算7日。无物流签收记录的（如自提），以订单显示已签收或已完成状态时间为准。超期后不再受理无理由退货，但质量问题、错发等仍可按售后质量流程申请。",
+    "exceptions": ["因物流原因导致签收信息错误的，可凭物流凭证申请恢复时效"],
+    "applies_to": {"product_types": ["*"], "scenes": []}
+  },
+  {
+    "clause_id": "RETURN-SEVENDAY-02",
+    "policy_id": "RETURN-SEVENDAY",
+    "version": 4,
+    "effective_from": "2026-12-01",
+    "effective_to": null,
+    "category": "return",
+    "title": "七天无理由的时效起算与超期处理",
+    "body": "时效以物流签收时间为准，签收次日起算7日。无物流签收记录的（如自提），以订单显示已签收或已完成状态时间为准。签收后第8~10日内，如消费者首次提出且商品完好，可申请一次特殊受理（需人工审核）。",
+    "exceptions": ["每人每年最多3次特殊受理机会"],
+    "applies_to": {"product_types": ["*"], "scenes": []}
+  },
+  {
+    "clause_id": "RETURN-SEVENDAY-03",
+    "policy_id": "RETURN-SEVENDAY",
+    "version": 3,
+    "effective_from": "2026-01-01",
+    "effective_to": null,
+    "category": "return",
+    "title": "七天无理由的运费与赠品",
+    "body": "退货运费由消费者承担（法定），除商家另有承诺。退货时须将商品本身、配件及赠品一并退回。赠品无法退回的，商家可要求按事先标明的赠品价格支付赠品价款。",
+    "exceptions": ["赠品本身存在质量问题，不得因此拒绝主商品退货"],
+    "applies_to": {"product_types": ["*"], "scenes": []}
+  },
+  {
+    "clause_id": "RETURN-GOOD-STANDARD-01",
+    "policy_id": "RETURN-GOOD-STANDARD",
+    "version": 3,
+    "effective_from": "2026-01-01",
+    "effective_to": null,
+    "category": "return",
+    "title": "商品完好的判定标准",
+    "body": "商品保持原有品质、功能，商品本身、配件、商标标识齐全的，视为完好。开箱查验不构成不完好：为确认商品品质、功能而打开包装或合理调试，不影响完好。商标标识被摘除或剪除、商品受污受损的，视为不完好。商家以不完好拒退的，须举证瑕疵由消费者造成；举证不能的不得拒退。",
+    "exceptions": [
+      "食品/化妆品/医疗器械/计生用品：必要的一次性密封包装被损坏视为不完好",
+      "电子电器类：未经授权维修改动、破坏认证标志或序列号、有难以恢复的外观使用痕迹、已激活或留存个人数据视为不完好",
+      "服装鞋帽箱包家居类：吊牌被摘剪、受污受损视为不完好"
+    ],
+    "applies_to": {"product_types": ["apparel", "electronics", "fresh", "beauty", "furniture"], "scenes": []}
+  },
+  {
+    "clause_id": "RETURN-EXCEPTION-01",
+    "policy_id": "RETURN-EXCEPTION",
+    "version": 3,
+    "effective_from": "2026-01-01",
+    "effective_to": null,
+    "category": "return",
+    "title": "不适用七天无理由的商品",
+    "body": "以下商品不适用七天无理由退货：消费者定作的商品（如定制刻字、定制尺寸、定制图案、按需生产）；鲜活易腐的商品（生鲜果蔬、肉类、水产、鲜花、乳制品等）；在线下载或消费者拆封的音像制品、计算机软件等数字化商品（虚拟充值、会员卡、课程、电子书、激活码）；交付的报纸、期刊。",
+    "exceptions": [
+      "拆封后易影响人身安全或生命健康、易致品质改变的商品（如食品、化妆品拆封），需购买时确认方可排除",
+      "一经激活或试用后价值贬损较大的商品（手机激活、盲盒拆封、乐器吹奏），需购买时确认方可排除",
+      "销售时已明示的临近保质期商品、瑕疵商品，需购买时确认方可排除",
+      "此类确认排除必须在购买必经流程中设置显著确认，无确认的不得拒绝退货",
+      "商家不得擅自扩大不适用范围，如箱包、奢侈品未举证性质不宜退货的仍应可退"
+    ],
+    "applies_to": {"product_types": ["custom", "fresh", "digital", "book"], "scenes": []}
+  },
+
+  {
+    "clause_id": "AFTERSALE-EXCHANGE-01",
+    "policy_id": "AFTERSALE-EXCHANGE",
+    "version": 3,
+    "effective_from": "2026-01-01",
+    "effective_to": null,
+    "category": "exchange",
+    "title": "换货的申请条件与时效",
+    "body": "国家规定三包商品：自开具发票之日起7日内发生性能故障，可选退货/换货/修理；8~15日内发生性能故障，可选换货或修理。平台支持不喜欢就换的普通商品（如服饰尺码不合适）：以商品页承诺为准，默认签收次日起7日内可换，仅限同款不同规格。换货商品发出后，三包有效期自换货之日起重新计算。",
+    "exceptions": [
+      "非三包商品且页面未承诺换货的，不强制支持换货",
+      "换货次数一般不超过2次（同款同规格）",
+      "定制商品不支持无理由换货，仅质量问题可按约定处理"
+    ],
+    "applies_to": {"product_types": ["electronics", "apparel", "furniture"], "scenes": []}
+  },
+  {
+    "clause_id": "AFTERSALE-REPAIR-01",
+    "policy_id": "AFTERSALE-REPAIR",
+    "version": 3,
+    "effective_from": "2026-01-01",
+    "effective_to": null,
+    "category": "repair",
+    "title": "保修与维修服务",
+    "body": "三包商品在三包有效期内（主机通常1年、主要部件按国家规定）出现性能故障，可享受免费修理。修理超过30日未完成的，可要求更换或退货。因无配件供应导致超90日未修复的，消费者可要求退换。",
+    "exceptions": [
+      "人为损坏、非授权拆修、超出保修期的按付费维修处理",
+      "三包有效期遇法定节假日可顺延",
+      "商家主张人为损坏的，须提供检测报告"
+    ],
+    "applies_to": {"product_types": ["electronics", "furniture"], "scenes": []}
+  },
+
+  {
+    "clause_id": "LOGISTICS-01",
+    "policy_id": "LOGISTICS",
+    "version": 3,
+    "effective_from": "2026-01-01",
+    "effective_to": null,
+    "category": "logistics",
+    "title": "未按时发货的赔付",
+    "body": "商家须在承诺时间内发货（默认付款后48小时内，预售商品按页面约定）。超时未发货，消费者可申请催发货，商家须24小时内回应。超72小时仍未发货，消费者可申请仅退款（无需退货）。部分类目逾期未发货，平台按订单金额一定比例（通常5%，单笔上限500元）赔付。",
+    "exceptions": ["预售商品、定制商品、不可抗力（疫情管控、极端天气）按页面约定，不适用逾期赔付"],
+    "applies_to": {"product_types": ["*"], "scenes": ["unshipped"]}
+  },
+  {
+    "clause_id": "LOGISTICS-02",
+    "policy_id": "LOGISTICS",
+    "version": 3,
+    "effective_from": "2026-01-01",
+    "effective_to": null,
+    "category": "logistics",
+    "title": "物流显示签收但未收到货",
+    "body": "物流显示签收但消费者未收到，应先向快递公司发起未收到货核查，商家须配合提供签收凭证。待核查期间，订单售后时效暂停计算。核查确认丢失的，按订单实付金额全额退款或补发。",
+    "exceptions": [
+      "签收凭证（本人签收、门卫代收、快递柜取件码使用记录）显示已妥投的，需用户先行确认是否由他人代收",
+      "生鲜类超过签收时间后才反馈的，需结合冷链时效判断"
+    ],
+    "applies_to": {"product_types": ["*"], "scenes": ["shipped"]}
+  },
+  {
+    "clause_id": "LOGISTICS-03",
+    "policy_id": "LOGISTICS",
+    "version": 3,
+    "effective_from": "2026-01-01",
+    "effective_to": null,
+    "category": "logistics",
+    "title": "商品运输破损的处理",
+    "body": "签收时发现外包装明显破损，应当面拒收或在签收后48小时内拍照（外包装加商品）并申请售后。核实为运输原因破损的，商家负责换货或退款，运费由商家承担。生鲜破损须在签收后24小时内反馈（冷链商品时效更短）。",
+    "exceptions": ["超过反馈时限且无法证明破损发生在运输途中的，需协商处理"],
+    "applies_to": {"product_types": ["*"], "scenes": ["delivered"]}
+  },
+
+  {
+    "clause_id": "ORDER-ADDRESS-01",
+    "policy_id": "ORDER-ADDRESS",
+    "version": 3,
+    "effective_from": "2026-01-01",
+    "effective_to": null,
+    "category": "address",
+    "title": "修改收货地址",
+    "body": "未发货可直接在订单内修改收货地址，或联系客服修改，修改后订单金额不变。已发货无法修改地址，可联系快递申请中转改地址，是否支持、是否收费由快递公司决定，产生的转寄费用由用户承担。跨境订单、预售订单不支持修改地址。",
+    "exceptions": ["订单已进入待揽收状态后，修改需商家与快递确认"],
+    "applies_to": {"product_types": ["*"], "scenes": ["unshipped", "shipped"]}
+  },
+  {
+    "clause_id": "ORDER-ADDRESS-02",
+    "policy_id": "ORDER-ADDRESS",
+    "version": 3,
+    "effective_from": "2026-01-01",
+    "effective_to": null,
+    "category": "address",
+    "title": "修改订单商品规格（换色换码）",
+    "body": "未发货订单可申请取消后重拍。部分商品支持同款同价更换规格（商家开启该功能时），不额外收费。已享受满减或优惠券的订单换规格重拍后，可能无法再次享受同等优惠，差额由用户承担。",
+    "exceptions": ["定制商品已进入生产流程的不可更换规格"],
+    "applies_to": {"product_types": ["*"], "scenes": ["unshipped"]}
+  },
+
+  {
+    "clause_id": "INVOICE-01",
+    "policy_id": "INVOICE",
+    "version": 3,
+    "effective_from": "2026-01-01",
+    "effective_to": null,
+    "category": "invoice",
+    "title": "发票开具与换开",
+    "body": "订单完成后可在90天内申请开票，支持电子普票与增值税专用发票。专票需提供开票信息并经商家审核，通常3~5个工作日开具。发票信息填错可申请换开，原发票需作废。",
+    "exceptions": ["退款成功的订单不再开具发票", "已开发票的订单退款，需先退回或作废发票"],
+    "applies_to": {"product_types": ["*"], "scenes": []}
+  },
+  {
+    "clause_id": "INVOICE-02",
+    "policy_id": "INVOICE",
+    "version": 3,
+    "effective_from": "2026-01-01",
+    "effective_to": null,
+    "category": "invoice",
+    "title": "售后所需的凭证",
+    "body": "质量问题需提供：订单号、商品问题照片或视频、必要时的检测说明。三包售后需提供：购买凭证（订单截图或发票）、三包凭证（如手机保修卡）。平台以订单数据为准判断售后资格，消费者无需重复提交订单信息。",
+    "exceptions": ["无法提供上述凭证时，平台可依据订单数据协助核实，不因缺少纸质凭证直接拒绝法定售后权益"],
+    "applies_to": {"product_types": ["*"], "scenes": []}
+  },
+
+  {
+    "clause_id": "PRICE-PROTECT-01",
+    "policy_id": "PRICE-PROTECT",
+    "version": 3,
+    "effective_from": "2026-01-01",
+    "effective_to": null,
+    "category": "price",
+    "title": "价保的适用范围与时效",
+    "body": "标注支持价保的商品，自下单付款之日起15日内，同一商品在同一店铺出现降价（页面标价下降），可申请价格保护。差价按实付金额计算，价保以补偿形式退回（原支付渠道或账户余额），不改变订单、不影响售后资格。购买时使用优惠券、满减、红包导致实付价低的，价保对比基准为同条件下的可成交价，而非公开标价。",
+    "exceptions": [
+      "大促期间（平台指定的618、双11、年货节）降价不适用价保",
+      "限时秒杀、清仓、库存尾货、会员专属价、直播专享价不适用",
+      "使用品类券、店铺券后价格变化不适用",
+      "已申请退货退款的订单不适用"
+    ],
+    "applies_to": {"product_types": ["*"], "scenes": ["price_protect"]}
+  },
+  {
+    "clause_id": "PRICE-PROTECT-02",
+    "policy_id": "PRICE-PROTECT",
+    "version": 3,
+    "effective_from": "2026-01-01",
+    "effective_to": null,
+    "category": "price",
+    "title": "价保申请的时限与次数",
+    "body": "价保申请须在降价发生后的7日内提出，且不晚于下单后15日。同一订单多次降价可多次申请，累计补偿不超过订单实付金额。价保审核通常1~3个工作日，补偿到账时间同退款时效。",
+    "exceptions": ["商品已退货、已换货且原商品退回的，价保资格终止"],
+    "applies_to": {"product_types": ["*"], "scenes": ["price_protect"]}
+  },
+
+  {
+    "clause_id": "PRESALE-01",
+    "policy_id": "PRESALE",
+    "version": 3,
+    "effective_from": "2026-01-01",
+    "effective_to": null,
+    "category": "presale",
+    "title": "预售定金与尾款的规则",
+    "body": "预售商品支付定金后，须在约定时间支付尾款；定金可抵扣尾款。尾款支付截止前，用户可取消订单并退还定金（部分商家约定定金不退，以页面约定为准，但须在下单前显著提示）。未按时支付尾款的，视为放弃购买，定金处理以页面约定为准；若商家未在下单前明确提示定金不退，则应当退还。",
+    "exceptions": [
+      "商家原因（缺货、无法发货）导致无法成交的，定金全额退还",
+      "定金金额不得超过商品总价的20%（法定上限）"
+    ],
+    "applies_to": {"product_types": ["*"], "scenes": ["presale"]}
+  },
+  {
+    "clause_id": "PRESALE-02",
+    "policy_id": "PRESALE",
+    "version": 3,
+    "effective_from": "2026-01-01",
+    "effective_to": null,
+    "category": "presale",
+    "title": "预售商品的发货时间",
+    "body": "预售商品发货时间以商品页或订单页标注的预售发货时间为准，不适用普通商品48小时发货规则。超出预售约定发货时间未发货的，可申请催发货，超约定时间7日仍未发出的，可申请仅退款并全额退还定金与尾款。预售商品不支持逾期发货赔付。",
+    "exceptions": ["不可抗力导致延迟的，商家须提前告知并给出新时间"],
+    "applies_to": {"product_types": ["*"], "scenes": ["presale"]}
+  },
+
+  {
+    "clause_id": "TRADE-IN-01",
+    "policy_id": "TRADE-IN",
+    "version": 3,
+    "effective_from": "2026-01-01",
+    "effective_to": null,
+    "category": "tradein",
+    "title": "以旧换新的旧机评估与抵扣",
+    "body": "旧机价格由回收商检测评估确定，下单时展示的是预估价，最终以检测结果为准。旧机抵扣金额从新机货款中直接扣减；若最终评估价低于预估价，需补差价或取消订单。旧机寄出后，新机订单不可单独退货（须连旧机抵扣一并处理）。",
+    "exceptions": [
+      "旧机无法回收（如已严重损坏、非本人所有、型号不符）的，需按新机原价补款，或取消订单并退回旧机",
+      "新机7天无理由退货时，旧机抵扣部分以原抵扣金额返还，旧机不予退还（已折价收购）"
+    ],
+    "applies_to": {"product_types": ["electronics", "furniture"], "scenes": ["trade_in"]}
+  },
+  {
+    "clause_id": "TRADE-IN-02",
+    "policy_id": "TRADE-IN",
+    "version": 3,
+    "effective_from": "2026-01-01",
+    "effective_to": null,
+    "category": "tradein",
+    "title": "以旧换新的新机售后",
+    "body": "以旧换新购买的新机，售后权益与普通购买完全一致（7天无理由、三包等），退款时按实付金额（扣除旧机抵扣后的金额）退还。",
+    "exceptions": ["若退款时旧机已拆解处理，旧机抵扣金额无法以实物形式返还，仅退还实付现金部分"],
+    "applies_to": {"product_types": ["electronics"], "scenes": ["trade_in"]}
+  },
+
+  {
+    "clause_id": "CROSSBORDER-01",
+    "policy_id": "CROSSBORDER",
+    "version": 3,
+    "effective_from": "2026-01-01",
+    "effective_to": null,
+    "category": "crossborder",
+    "title": "跨境订单的售后限制",
+    "body": "跨境商品受海关监管，清关放行后不支持七天无理由退货（商品已入境销售）。质量问题、错发漏发仍可申请售后，退款须经海关退运手续，时效较长。退款到账受境外银行与清关时效影响，通常7~15个工作日。",
+    "exceptions": [
+      "商品未清关前（待清关中）的订单，可申请取消并退款",
+      "因海关政策原因无法入境的，全额退款"
+    ],
+    "applies_to": {"product_types": ["*"], "scenes": ["crossborder"]}
+  },
+  {
+    "clause_id": "CROSSBORDER-02",
+    "policy_id": "CROSSBORDER",
+    "version": 3,
+    "effective_from": "2026-01-01",
+    "effective_to": null,
+    "category": "crossborder",
+    "title": "跨境订单的税费处理",
+    "body": "订单价格通常含行邮税或跨境综合税。质量问题退款时，税费随商品款一并退还。非质量原因的退货（如未清关前主动取消），已缴纳的税费按海关实际退还情况处理，未实际征收的不予收取。",
+    "exceptions": ["个人超额购买导致补税的，补税部分不退"],
+    "applies_to": {"product_types": ["*"], "scenes": ["crossborder"]}
+  },
+
+  {
+    "clause_id": "B2B-01",
+    "policy_id": "B2B",
+    "version": 3,
+    "effective_from": "2026-01-01",
+    "effective_to": null,
+    "category": "b2b",
+    "title": "企业采购订单的售后差异",
+    "body": "企业采购订单不适用七天无理由退货（属商业采购，非生活消费）。售后以合同约定为准，未约定的按质量问题处理。换货、维修按合同或商家承诺执行，通常需走企业售后专线。",
+    "exceptions": [
+      "企业账号下的个人消费订单（非批量），可按普通消费者规则处理，需商家确认",
+      "合同约定优于法定承诺的，从其约定"
+    ],
+    "applies_to": {"product_types": ["*"], "scenes": ["b2b"]}
+  }
+]

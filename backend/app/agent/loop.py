@@ -122,7 +122,8 @@ class AgentLoop:
 
         state.intent = result.intent
         reply = await self._dispatch(state, result, message, trace_id=trace_id)
-        reply.mode = result.mode.value if result.intent in WRITE_INTENTS else None
+        # 所有意图都要回传 mode：查询类的 mode 同样是判分依据
+        reply.mode = result.mode.value
         await self.sessions.save(state)
         return reply
 

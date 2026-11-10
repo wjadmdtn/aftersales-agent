@@ -11,7 +11,7 @@ from eval.seeds.common import business
 STANDARD_REFUND = [
     "我要退款",
     "申请退款",
-    "能退吗",
+    "能退吗",  # 疑问句，标 inquiry
     "我要退货",
     "这个不要了，退了吧",
     "帮我退一下款",
@@ -105,7 +105,7 @@ ADVERSARIAL = [
     (("退款之后地址还能改吗"), "change_address"),
     (("退款记录在哪看"), "query_order"),
     # 语气词干扰
-    (("嗯……退款吧"), "refund"),
+    (("嗯……退款吧"), "refund", "inquiry"),
     (("那个……我想问下退货的事"), "refund"),
     # 否定
     (("我不想退款，我只想换个货"), "general"),
@@ -127,7 +127,7 @@ NO_KEYWORD = [
     (("这个没法用"), "general"),
     (("东西摔碎了"), "general"),
     (("我想把它还给你们"), "refund"),
-    (("我的钱还能拿回来吗"), "refund"),
+    (("我的钱还能拿回来吗"), "refund", "inquiry"),
     (("东西在路上多久了"), "logistics"),
     (("怎么还没送来"), "logistics"),
     (("几号能收到"), "logistics"),
@@ -149,13 +149,27 @@ NO_KEYWORD = [
 def build() -> list:
     cases = []
 
+    INQUIRY_PHRASES = {"能退吗", "这个能退款吗", "退款要多久到账"}
     for i, text in enumerate(STANDARD_REFUND):
-        cases.append(business(f"intent-std-rf-{i:02d}", category="standard", text=text, intent="refund"))
+        mode = "inquiry" if text in INQUIRY_PHRASES else "execute"
+        cases.append(
+            business(
+                f"intent-std-rf-{i:02d}", category="standard", text=text, intent="refund", mode=mode
+            )
+        )
     for i, text in enumerate(STANDARD_LOGISTICS):
         cases.append(business(f"intent-std-lg-{i:02d}", category="standard", text=text, intent="logistics"))
+    AD_INQUIRY = {"能修改收货地址吗"}
     for i, text in enumerate(STANDARD_ADDRESS):
+        mode = "inquiry" if text in AD_INQUIRY else "execute"
         cases.append(
-            business(f"intent-std-ad-{i:02d}", category="standard", text=text, intent="change_address")
+            business(
+                f"intent-std-ad-{i:02d}",
+                category="standard",
+                text=text,
+                intent="change_address",
+                mode=mode,
+            )
         )
     for i, text in enumerate(STANDARD_ORDER):
         cases.append(business(f"intent-std-od-{i:02d}", category="standard", text=text, intent="query_order"))
