@@ -5,99 +5,99 @@
   "metrics": [
     {
       "name": "业务动作准确率",
-      "value": 0.5429,
-      "passed": 57,
+      "value": 0.3048,
+      "passed": 32,
       "total": 105,
-      "baseline": null,
-      "delta": null
+      "baseline": 0.5429,
+      "delta": -0.2381
     },
     {
       "name": "业务动作-standard",
-      "value": 0.7455,
-      "passed": 41,
+      "value": 0.4182,
+      "passed": 23,
       "total": 55,
-      "baseline": null,
-      "delta": null
+      "baseline": 0.7455,
+      "delta": -0.3273
     },
     {
       "name": "业务动作-adversarial",
-      "value": 0.4667,
-      "passed": 14,
+      "value": 0.2667,
+      "passed": 8,
       "total": 30,
-      "baseline": null,
-      "delta": null
+      "baseline": 0.4667,
+      "delta": -0.2
     },
     {
       "name": "业务动作-no_keyword",
-      "value": 0.1,
-      "passed": 2,
+      "value": 0.05,
+      "passed": 1,
       "total": 20,
-      "baseline": null,
-      "delta": null
+      "baseline": 0.1,
+      "delta": -0.05
     },
     {
       "name": "澄清正确率",
       "value": 0.725,
       "passed": 29,
       "total": 40,
-      "baseline": null,
-      "delta": null
+      "baseline": 0.725,
+      "delta": 0.0
     },
     {
       "name": "无关输入正确率",
       "value": 1.0,
       "passed": 20,
       "total": 20,
-      "baseline": null,
-      "delta": null
+      "baseline": 1.0,
+      "delta": 0.0
     },
     {
       "name": "转人工正确率",
       "value": 0.7333,
       "passed": 22,
       "total": 30,
-      "baseline": null,
-      "delta": null
+      "baseline": 0.7333,
+      "delta": 0.0
     },
     {
       "name": "端到端成功率",
       "value": 0.96,
       "passed": 24,
       "total": 25,
-      "baseline": null,
-      "delta": null
+      "baseline": 0.96,
+      "delta": 0.0
     },
     {
       "name": "意图识别总体",
-      "value": 0.6564,
-      "passed": 128,
+      "value": 0.5282,
+      "passed": 103,
       "total": 195,
-      "baseline": null,
-      "delta": null
+      "baseline": 0.6564,
+      "delta": -0.1282
     },
     {
       "name": "过度转接率",
       "value": 0.025,
       "passed": 1,
       "total": 40,
-      "baseline": null,
-      "delta": null
+      "baseline": 0.025,
+      "delta": 0.0
     },
     {
       "name": "转人工漏转率",
       "value": 0.2667,
       "passed": 8,
       "total": 30,
-      "baseline": null,
-      "delta": null
+      "baseline": 0.2667,
+      "delta": 0.0
     },
     {
       "name": "话术承诺泄露",
       "value": 0.0,
       "passed": null,
       "total": 220,
-      "baseline": null,
-      "delta": null
+      "baseline": 0.0,
+      "delta": 0.0
     }
   ]
 }

@@ -10,7 +10,14 @@ from app.eval.schema import EvalCase, EvalPath  # noqa: E402
 
 
 def business(
-    cid: str, *, category: str, text: str, intent: str, order_id: str = "ORD1002", notes: str | None = None
+    cid: str,
+    *,
+    category: str,
+    text: str,
+    intent: str,
+    mode: str = "execute",
+    order_id: str = "ORD1002",
+    notes: str | None = None,
 ) -> EvalCase:
     return EvalCase(
         id=cid,
@@ -18,7 +25,7 @@ def business(
         path=EvalPath.BUSINESS_ACTION,
         input=text,
         context={"order_id": order_id},
-        expect={"intent": intent},
+        expect={"intent": intent, "mode": mode},
         notes=notes,
     )
 

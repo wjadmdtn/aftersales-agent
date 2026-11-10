@@ -39,11 +39,19 @@ def grade(case: EvalCase, actual: dict[str, Any]) -> GradeResult:
 
 
 def _grade_business(case: EvalCase, actual: dict[str, Any]) -> list[str]:
+    failures: list[str] = []
     expected = case.expect["intent"]
     got = actual.get("intent")
     if got != expected:
-        return [f"intent：期望 {expected}，实际 {got}"]
-    return []
+        failures.append(f"intent：期望 {expected}，实际 {got}")
+
+    # mode：EXECUTE / INQUIRY / QUERY 决定系统是执行还是只回答
+    if "mode" in case.expect:
+        want = case.expect["mode"]
+        has = actual.get("mode")
+        if has != want:
+            failures.append(f"mode：期望 {want}，实际 {has}")
+    return failures
 
 
 def _grade_clarify(case: EvalCase, actual: dict[str, Any]) -> list[str]:

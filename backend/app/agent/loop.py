@@ -27,6 +27,7 @@ from app.agent.session import SessionStore, snapshot_mismatch
 from app.agent.tools.client import MockServiceClient
 from app.models.agent import (
     READ_INTENTS,
+    IntentMode,
     WRITE_INTENTS,
     Intent,
     IntentSource,
@@ -45,6 +46,7 @@ AMOUNT_PATTERN = re.compile(r"(\d+(?:\.\d{1,2})?)\s*(?:元|块|块钱)?")
 class AgentReply:
     reply: str
     intent: Intent | None = None
+    mode: str | None = None
     source: IntentSource = IntentSource.LLM
     tool_calls: list[str] = field(default_factory=list)
     state: str = "done"
@@ -103,6 +105,13 @@ class AgentLoop:
             await self.sessions.save(state)
             return reply
 
+        # mode 兜底校验：LLM 判错时往保守方向纠偏
+        from app.agent.intent_mode import normalize_mode
+
+        fixed_mode, fix_note = normalize_mode(result.intent, result.mode, message)
+        if fix_note:
+            result = result.model_copy(update={"mode": fixed_mode, "reason": fix_note})
+
         # ---- 3. 订单号切换 ----
         mentioned = ORDER_ID_PATTERN.search(message)
         if mentioned and mentioned.group(0) != state.order_id:
@@ -113,6 +122,7 @@ class AgentLoop:
 
         state.intent = result.intent
         reply = await self._dispatch(state, result, message, trace_id=trace_id)
+        reply.mode = result.mode.value if result.intent in WRITE_INTENTS else None
         await self.sessions.save(state)
         return reply
 
@@ -172,10 +182,23 @@ class AgentLoop:
     ) -> AgentReply:
         intent: Intent = result.intent
 
+        mode = getattr(result, "mode", IntentMode.EXECUTE)
+
         if intent in READ_INTENTS:
             return await self._handle_read(state, intent, trace_id=trace_id)
 
         if intent in WRITE_INTENTS:
+            if mode is IntentMode.INQUIRY:
+                # 咨询可行性：回答能不能，不执行
+                return await self._handle_inquiry(state, intent, trace_id=trace_id)
+            if mode is IntentMode.QUERY:
+                return await self._handle_refund_progress(state, trace_id=trace_id)
+            if mode is IntentMode.NEED_CONTEXT:
+                return AgentReply(
+                    reply="请问是哪一笔订单呢？麻烦提供一下订单号。",
+                    intent=intent,
+                    state="need_order",
+                )
             return await self._handle_write(state, intent, message, trace_id=trace_id)
 
         if intent is Intent.MANUAL:
@@ -248,6 +271,67 @@ class AgentLoop:
             intent=Intent.MANUAL if primary_intent == "manual" else Intent.COMPLAINT,
             state="handoff_queued",
         )
+
+    async def _handle_inquiry(
+        self, state: SessionState, intent: Intent, *, trace_id: str
+    ) -> AgentReply:
+        """回答"能做吗"，不执行任何写操作。"""
+        if not state.order_id:
+            return AgentReply(
+                reply="请问是哪一笔订单呢？我帮您确认一下。",
+                intent=intent,
+                state="need_order",
+            )
+
+        body = await self.tools.get_order(state.order_id, trace_id=trace_id)
+        if body.get("code") != ResultCode.OK:
+            return AgentReply(reply=present.render(body), intent=intent, state="inquiry_failed")
+
+        order = body.get("data") or {}
+        status = order.get("status")
+
+        if intent is Intent.REFUND:
+            if status in ("PAID", "SHIPPED", "DELIVERED"):
+                reply = (
+                    f"这笔订单（¥{order.get('amount')}）目前符合退款条件，"
+                    "如果您确定要退，告诉我就行，我帮您提交申请。"
+                )
+            elif status == "REFUNDED":
+                reply = "这笔订单已经退款完成了，不需要重复申请哦。"
+            elif status == "REFUNDING":
+                reply = "这笔订单正在退款处理中，请留意到账通知。"
+            else:
+                reply = "这笔订单目前的状态暂时不支持退款。"
+        else:
+            if status in ("PENDING_PAYMENT", "PAID"):
+                reply = "这笔订单还没发货，可以修改收货地址。需要我帮您改吗？"
+            else:
+                reply = "订单已经发货了，收货地址无法修改。"
+
+        return AgentReply(reply=reply, intent=intent, state="inquiry_answered")
+
+    async def _handle_refund_progress(self, state: SessionState, *, trace_id: str) -> AgentReply:
+        """查退款进度。固定话术，不调 LLM。"""
+        if not state.order_id:
+            return AgentReply(
+                reply="请问是哪一笔订单呢？我帮您查一下退款进度。",
+                intent=Intent.REFUND,
+                state="need_order",
+            )
+
+        body = await self.tools.get_order(state.order_id, trace_id=trace_id)
+        if body.get("code") != ResultCode.OK:
+            return AgentReply(reply=present.render(body), state="query_failed")
+
+        status = (body.get("data") or {}).get("status")
+        if status == "REFUNDING":
+            reply = "您的退款申请已经提交，预计 1-3 个工作日原路退回，请留意账户到账。"
+        elif status == "REFUNDED":
+            reply = "这笔订单的退款已经完成，请留意账户到账，如未收到可联系发卡行。"
+        else:
+            reply = "这笔订单目前没有退款记录哦。是遇到什么问题了吗？"
+
+        return AgentReply(reply=reply, intent=Intent.REFUND, state="refund_progress")
 
     async def _handle_read(
         self, state: SessionState, intent: Intent, *, trace_id: str

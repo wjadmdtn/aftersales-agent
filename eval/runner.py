@@ -199,6 +199,7 @@ async def run_case(client, mock_app, case: EvalCase, trace: str) -> dict:
     data = r.json()
     out = {
         "intent": data.get("intent"),
+        "mode": data.get("mode"),
         "state": data.get("state"),
         "reply": data.get("reply", ""),
         "triggered": data.get("state") == "handoff_queued",

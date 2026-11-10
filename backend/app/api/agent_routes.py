@@ -34,6 +34,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
     intent: str | None = None
+    mode: str | None = None
     source: str
     tool_calls: list[str] = Field(default_factory=list)
     state: str
@@ -83,6 +84,7 @@ async def chat(req: ChatRequest, request: Request) -> ChatResponse:
     return ChatResponse(
         reply=result.reply,
         intent=result.intent.value if result.intent else None,
+        mode=result.mode,
         source=result.source.value,
         tool_calls=result.tool_calls,
         state=result.state,

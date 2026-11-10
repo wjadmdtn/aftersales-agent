@@ -33,6 +33,27 @@ WRITE_INTENTS = {Intent.REFUND, Intent.CHANGE_ADDRESS}
 READ_INTENTS = {Intent.LOGISTICS, Intent.QUERY_ORDER}
 
 
+class IntentMode(StrEnum):
+    """同一句话，模式不同，行为完全不同。
+
+    "我要退款"      → EXECUTE  弹确认后执行
+    "这个能退款吗"   → INQUIRY  回答能不能，不执行
+    "退款到哪了"     → QUERY    查进度，不执行
+    "退了吧"（无上下文）→ NEED_CONTEXT  追问缺失信息
+    """
+
+    EXECUTE = "execute"
+    INQUIRY = "inquiry"
+    QUERY = "query"
+    NEED_CONTEXT = "need_context"
+
+
+# 含这些词倾向 INQUIRY（疑问/假设）
+INQUIRY_MARKERS = ("吗", "能不能", "可不可以", "行不行", "如何", "怎么", "是否", "可以吗", "吗？")
+# 含这些词倾向 EXECUTE（祈使）
+EXECUTE_MARKERS = ("我要", "帮我", "麻烦", "请", "给我", "退了吧", "退了吧", "改成", "退了")
+
+
 class IntentSource(StrEnum):
     LLM = "llm"
     DEGRADED = "degraded"
@@ -40,6 +61,7 @@ class IntentSource(StrEnum):
 
 class IntentResult(BaseModel):
     intent: Intent
+    mode: IntentMode = IntentMode.EXECUTE
     confidence: float = Field(ge=0, le=1)
     source: IntentSource = IntentSource.LLM
     params: dict[str, Any] = Field(default_factory=dict)

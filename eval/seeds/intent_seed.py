@@ -84,9 +84,9 @@ ADVERSARIAL = [
     (("你们这是欺诈，我要曝光你们不退款"), "complaint"),
     (("信不信我给差评，退个款这么难"), "complaint"),
     # 咨询可行性 —— 先回答，不直接走流程
-    (("这个能退款吗"), "refund"),
-    (("我这个情况可以退货吗"), "refund"),
-    (("退款要多久到账"), "refund"),
+    (("这个能退款吗"), "refund", "inquiry"),
+    (("我这个情况可以退货吗"), "refund", "inquiry"),
+    (("退款要多久到账"), "refund", "query"),
     # 历史陈述 —— 是抱怨过去
     (("上次退款你们拖了半个月"), "complaint"),
     (("上一单退款到现在还没到"), "complaint"),
@@ -123,9 +123,9 @@ ADVERSARIAL = [
 # ---------- 无关键词但有明确诉求 20 条 ----------
 
 NO_KEYWORD = [
-    (("钱什么时候能回来"), "refund"),
+    (("钱什么时候能回来"), "refund", "query"),
     (("这个没法用"), "general"),
-    (("东西摔碎了"), "refund"),
+    (("东西摔碎了"), "general"),
     (("我想把它还给你们"), "refund"),
     (("我的钱还能拿回来吗"), "refund"),
     (("东西在路上多久了"), "logistics"),
@@ -160,14 +160,22 @@ def build() -> list:
     for i, text in enumerate(STANDARD_ORDER):
         cases.append(business(f"intent-std-od-{i:02d}", category="standard", text=text, intent="query_order"))
 
-    for i, (text, intent) in enumerate(ADVERSARIAL):
+    for i, row in enumerate(ADVERSARIAL):
+        text, intent = row[0], row[1]
+        mode = row[2] if len(row) > 2 else "execute"
         cases.append(
-            business(f"intent-adv-{i:02d}", category="adversarial", text=text, intent=intent)
+            business(
+                f"intent-adv-{i:02d}", category="adversarial", text=text, intent=intent, mode=mode
+            )
         )
 
-    for i, (text, intent) in enumerate(NO_KEYWORD):
+    for i, row in enumerate(NO_KEYWORD):
+        text, intent = row[0], row[1]
+        mode = row[2] if len(row) > 2 else "execute"
         cases.append(
-            business(f"intent-nokw-{i:02d}", category="no_keyword", text=text, intent=intent)
+            business(
+                f"intent-nokw-{i:02d}", category="no_keyword", text=text, intent=intent, mode=mode
+            )
         )
 
     return cases
