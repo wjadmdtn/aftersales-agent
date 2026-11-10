@@ -46,7 +46,15 @@ def _format_clauses(retrieval: RetrievalResult) -> str:
 _SYSTEM_PROMPT = """你是客服意图识别器。判断用户**真实诉求**，只输出 JSON。
 
 意图只能是：refund(发起退款) / logistics(查物流) / change_address(改地址) /
-query_order(查订单) / complaint(投诉) / manual(要人工) / general(其他)
+query_order(查订单) / complaint(投诉) / manual(要人工) / policy(政策咨询) / general(其他)
+
+**policy 与业务意图的边界**（最容易混）：
+- policy：问"规则是什么"。例："能开发票吗""七天无理由怎么算""退款需要什么条件"
+  "多久发货""支持换货吗""运费险怎么用"
+- 业务意图：问"我这一单怎样"。例："我的订单发货了吗""我要退款""查下物流"
+
+判据：问的是**通用规则**就是 policy，问的是**我这一单的实际情况**就是业务意图。
+用户提到具体订单号时，多半是业务意图。
 
 **关键**：同样的词在不同语境下含义相反。必须区分：
 - 诉求：用户希望系统为他执行某个操作

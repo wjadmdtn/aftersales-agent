@@ -219,11 +219,13 @@ class AgentLoop:
                 state, message, primary_intent="complaint", trace_id=trace_id
             )
 
-        # 政策问题天然是兜底路径：先检索，答不了再澄清。
-        # 澄清是"没听懂"，检索是"听懂了但不是我该执行的事"——顺序反了会答非所问。
-        policy_reply = await self._try_policy(state, message, trace_id=trace_id)
-        if policy_reply is not None:
-            return policy_reply
+        if intent is Intent.POLICY:
+            # 只有 policy 意图才走检索。业务动作不必查政策——既慢又答非所问。
+            policy_reply = await self._try_policy(state, message, trace_id=trace_id)
+            if policy_reply is not None:
+                return policy_reply
+            # 检索不到：不猜、不编，交回澄清或转人工
+            return await self._clarify(state, message, trace_id=trace_id)
 
         # 无法识别可调用的工具：澄清优先，转人工是最后手段。
         # "AI 一时没理解"不等于"用户需要人工"——直接转会把人工成本吃光。

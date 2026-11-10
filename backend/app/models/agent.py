@@ -16,6 +16,7 @@ class Intent(StrEnum):
     QUERY_ORDER = "query_order"
     COMPLAINT = "complaint"
     MANUAL = "manual"
+    POLICY = "policy"      # 政策咨询：规则是什么，不是"我这一单怎样"
     GENERAL = "general"
 
 

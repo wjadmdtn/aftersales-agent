@@ -127,7 +127,7 @@ async def test_non_general_intents_never_retrieve(make_loop, msg, intent, mode):
 
 async def test_general_intent_retrieves_and_answers(make_loop):
     spy = _SpyPolicy()
-    responses = {"退款多久到账": IntentResult(intent=Intent.GENERAL, confidence=0.8)}
+    responses = {"退款多久到账": IntentResult(intent=Intent.POLICY, confidence=0.8)}
     loop, _ = make_loop(spy, responses=responses)
 
     reply = await loop.handle(
@@ -140,7 +140,7 @@ async def test_general_intent_retrieves_and_answers(make_loop):
 
 async def test_general_passes_order_created_at_and_product_type(make_loop):
     spy = _SpyPolicy()
-    responses = {"运费谁出": IntentResult(intent=Intent.GENERAL, confidence=0.8)}
+    responses = {"运费谁出": IntentResult(intent=Intent.POLICY, confidence=0.8)}
     loop, _ = make_loop(spy, responses=responses)
 
     await loop.handle(
@@ -154,7 +154,7 @@ async def test_general_passes_order_created_at_and_product_type(make_loop):
 
 async def test_miss_falls_back_to_clarify(make_loop):
     miss = _MissPolicy()
-    responses = {"你们老板是谁": IntentResult(intent=Intent.GENERAL, confidence=0.8)}
+    responses = {"你们老板是谁": IntentResult(intent=Intent.POLICY, confidence=0.8)}
     loop, _ = make_loop(miss, responses=responses)
 
     reply = await loop.handle(
@@ -166,7 +166,7 @@ async def test_miss_falls_back_to_clarify(make_loop):
 
 async def test_ambiguous_asks_instead_of_answering(make_loop):
     amb = _AmbiguousPolicy()
-    responses = {"能换吗": IntentResult(intent=Intent.GENERAL, confidence=0.8)}
+    responses = {"能换吗": IntentResult(intent=Intent.POLICY, confidence=0.8)}
     loop, _ = make_loop(amb, responses=responses)
 
     reply = await loop.handle(
@@ -188,7 +188,7 @@ async def test_degraded_never_retrieves(make_loop):
 
 
 async def test_no_policy_service_still_works(make_loop):
-    responses = {"退款多久到账": IntentResult(intent=Intent.GENERAL, confidence=0.8)}
+    responses = {"退款多久到账": IntentResult(intent=Intent.POLICY, confidence=0.8)}
     loop, _ = make_loop(None, responses=responses)
 
     reply = await loop.handle(
@@ -199,7 +199,7 @@ async def test_no_policy_service_still_works(make_loop):
 
 async def test_session_records_cited_clauses(make_loop):
     spy = _SpyPolicy()
-    responses = {"退款多久到账": IntentResult(intent=Intent.GENERAL, confidence=0.8)}
+    responses = {"退款多久到账": IntentResult(intent=Intent.POLICY, confidence=0.8)}
     loop, _ = make_loop(spy, responses=responses)
 
     await loop.handle(
@@ -226,7 +226,7 @@ async def test_full_chain_with_real_retriever(make_loop):
     service = PolicyService(retriever=retriever, llm=stub, timeout_ms=800)
 
     loop, _ = make_loop(service, responses={
-        "退款多久到账": IntentResult(intent=Intent.GENERAL, confidence=0.8)
+        "退款多久到账": IntentResult(intent=Intent.POLICY, confidence=0.8)
     })
     reply = await loop.handle(
         session_id="s1", user_id="u1", message="退款多久到账", trace_id="t1", order_id="ORD1002"
@@ -246,9 +246,35 @@ async def test_timeout_degrades_to_miss(make_loop):
     service = PolicyService(retriever=retriever, llm=stub, timeout_ms=20)
 
     loop, _ = make_loop(service, responses={
-        "退款多久到账": IntentResult(intent=Intent.GENERAL, confidence=0.8)
+        "退款多久到账": IntentResult(intent=Intent.POLICY, confidence=0.8)
     })
     reply = await loop.handle(
         session_id="s1", user_id="u1", message="退款多久到账", trace_id="t1", order_id="ORD1002"
     )
     assert reply.state == "clarifying", "检索超时应回落澄清，而不是报错"
+
+
+async def test_business_intent_does_not_retrieve(make_loop):
+    """业务动作不该触发政策检索——既慢又答非所问。"""
+    policy = _MissPolicy()
+    responses = {"我要退款": IntentResult(intent=Intent.REFUND, confidence=0.95)}
+    loop, _ = make_loop(policy, responses=responses)
+
+    reply = await loop.handle(
+        session_id="s1", user_id="u1", message="我要退款", trace_id="t1", order_id="ORD1002"
+    )
+    assert policy.calls == 0, "业务意图不得触发政策检索"
+    assert reply.state == "awaiting_confirmation"
+
+
+async def test_clarify_does_not_retrieve(make_loop):
+    """说不清的问题走澄清，不查政策。"""
+    policy = _MissPolicy()
+    responses = {"这个东西不好用": IntentResult(intent=Intent.GENERAL, confidence=0.7)}
+    loop, _ = make_loop(policy, responses=responses)
+
+    reply = await loop.handle(
+        session_id="s1", user_id="u1", message="这个东西不好用", trace_id="t1", order_id="ORD1002"
+    )
+    assert policy.calls == 0
+    assert reply.state == "clarifying"
