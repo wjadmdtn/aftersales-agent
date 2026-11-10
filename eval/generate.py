@@ -13,7 +13,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "backend"))
 
 from app.eval.loader import write_cases  # noqa: E402
-from eval.seeds import clarify_seed, e2e_seed, handoff_seed, intent_seed  # noqa: E402
+from eval.seeds import clarify_seed, e2e_seed, handoff_seed, intent_seed, policy_seed  # noqa: E402
 
 CASES_DIR = ROOT / "eval" / "cases"
 
@@ -24,6 +24,7 @@ EXPECTED = {
     "irrelevant": {"irrelevant": 20},
     "handoff": {"handoff": 30},
     "e2e": {"e2e": 25},
+    "policy": {"policy": 30},
 }
 
 
@@ -33,6 +34,7 @@ def main() -> int:
         "clarify.jsonl": clarify_seed.build(),
         "handoff.jsonl": handoff_seed.build(),
         "e2e.jsonl": e2e_seed.build(),
+        "policy.jsonl": policy_seed.build(),
     }
 
     CASES_DIR.mkdir(parents=True, exist_ok=True)

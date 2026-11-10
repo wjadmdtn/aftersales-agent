@@ -130,6 +130,7 @@ def _stub_classifier(text: str) -> IntentResult:
         (("物流", "快递", "包裹", "到哪", "发货"), Intent.LOGISTICS),
         (("地址",), Intent.CHANGE_ADDRESS),
         (("订单",), Intent.QUERY_ORDER),
+        (("发票", "保修", "价保", "七天无理由", "定金", "以旧换新", "凭证"), Intent.POLICY),
     ]
     for words, intent in table:
         if any(w in text for w in words):
@@ -197,6 +198,19 @@ async def run_case(client, mock_app, case: EvalCase, trace: str) -> dict:
         headers={"X-Trace-Id": trace},
     )
     data = r.json()
+    if case.path is EvalPath.POLICY:
+        from app.api.agent_routes import get_loop
+
+        loop = get_loop()
+        sess = await loop.sessions.get(f"eval-{case.id}")
+        cited = list(getattr(sess, "last_cited_clause_ids", []) or []) if sess else []
+        return {
+            "intent": data.get("intent"),
+            "state": data.get("state"),
+            "reply": data.get("reply", ""),
+            "cited_clause_ids": cited,
+        }
+
     out = {
         "intent": data.get("intent"),
         "mode": data.get("mode"),

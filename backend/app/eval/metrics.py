@@ -39,6 +39,19 @@ def compute_metrics(results: list[GradeResult]) -> list[MetricLine]:
     add("无关输入正确率", by_path[EvalPath.IRRELEVANT])
     add("转人工正确率", by_path[EvalPath.HANDOFF])
     add("端到端成功率", by_path[EvalPath.E2E])
+    add("政策问答准确率", by_path[EvalPath.POLICY])
+    # 政策路由：业务意图被误判为 policy 的比例
+    not_policy = [r for r in results if r.category == "not_policy"]
+    if not_policy:
+        wrong = sum(1 for r in not_policy if r.actual.get("intent") == "policy")
+        metrics.append(
+            MetricLine(
+                name="政策误路由率",
+                value=_rate(wrong, len(not_policy)),
+                passed=wrong,
+                total=len(not_policy),
+            )
+        )
 
     # 总体：所有非 e2e 用例的通过率
     general = [r for r in results if r.path is not EvalPath.E2E]

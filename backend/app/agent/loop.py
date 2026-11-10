@@ -269,7 +269,7 @@ class AgentLoop:
         state.policy_turns += 1
         return AgentReply(
             reply=answer.answer,
-            intent=Intent.GENERAL,
+            intent=Intent.POLICY,
             tool_calls=["policy.search"],
             state="policy_answered",
         )

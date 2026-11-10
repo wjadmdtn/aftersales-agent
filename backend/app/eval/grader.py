@@ -25,6 +25,7 @@ def grade(case: EvalCase, actual: dict[str, Any]) -> GradeResult:
         EvalPath.HANDOFF: _grade_handoff,
         EvalPath.IRRELEVANT: _grade_irrelevant,
         EvalPath.E2E: _grade_e2e,
+        EvalPath.POLICY: _grade_policy,
     }[case.path]
     failures = grader(case, actual)
     return GradeResult(
@@ -114,6 +115,22 @@ def _grade_irrelevant(case: EvalCase, actual: dict[str, Any]) -> list[str]:
 
     if expected.get("starts_with_apology") is False and reply.startswith(APOLOGY):
         failures.append("apology：无关输入不应道歉")
+
+    return failures
+
+
+def _grade_policy(case: EvalCase, actual: dict[str, Any]) -> list[str]:
+    """政策问答：意图必须是 policy；给了期望条款则要求命中。"""
+    failures: list[str] = []
+
+    if actual.get("intent") != "policy":
+        failures.append(f"intent：期望 policy，实际 {actual.get('intent')}")
+
+    want = case.expect.get("cited_clause")
+    if want:
+        cited = actual.get("cited_clause_ids") or []
+        if want not in cited:
+            failures.append(f"cited_clause：期望 {want}，实际 {cited or '未引用'}")
 
     return failures
 

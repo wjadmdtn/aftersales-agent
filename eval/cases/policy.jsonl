@@ -1,0 +1,35 @@
+{"id":"policy-refund-time","category":"policy","path":"policy","input":"退款多久能到账","context":{},"expect":{"intent":"policy","cited_clause":"REFUND-COMMON-01"},"notes":"政策咨询，期望命中 REFUND-COMMON-01"}
+{"id":"policy-refund-amount","category":"policy","path":"policy","input":"退款金额怎么算","context":{},"expect":{"intent":"policy","cited_clause":"REFUND-COMMON-02"},"notes":"政策咨询，期望命中 REFUND-COMMON-02"}
+{"id":"policy-refund-freight","category":"policy","path":"policy","input":"退货运费退不退","context":{},"expect":{"intent":"policy","cited_clause":"REFUND-COMMON-03"},"notes":"政策咨询，期望命中 REFUND-COMMON-03"}
+{"id":"policy-refund-timeout","category":"policy","path":"policy","input":"商家一直不处理退款怎么办","context":{},"expect":{"intent":"policy","cited_clause":"REFUND-COMMON-04"},"notes":"政策咨询，期望命中 REFUND-COMMON-04"}
+{"id":"policy-sevenday-scope","category":"policy","path":"policy","input":"七天无理由适用于哪些商品","context":{},"expect":{"intent":"policy","cited_clause":"RETURN-SEVENDAY-01"},"notes":"政策咨询，期望命中 RETURN-SEVENDAY-01"}
+{"id":"policy-sevenday-start","category":"policy","path":"policy","input":"七天无理由从哪天开始算","context":{},"expect":{"intent":"policy","cited_clause":"RETURN-SEVENDAY-02"},"notes":"政策咨询，期望命中 RETURN-SEVENDAY-02"}
+{"id":"policy-sevenday-expire","category":"policy","path":"policy","input":"超过七天还能退吗","context":{},"expect":{"intent":"policy","cited_clause":"RETURN-SEVENDAY-02"},"notes":"政策咨询，期望命中 RETURN-SEVENDAY-02"}
+{"id":"policy-sevenday-freight","category":"policy","path":"policy","input":"七天无理由退货运费谁出","context":{},"expect":{"intent":"policy","cited_clause":"RETURN-SEVENDAY-03"},"notes":"政策咨询，期望命中 RETURN-SEVENDAY-03"}
+{"id":"policy-sevenday-gift","category":"policy","path":"policy","input":"赠品要一起退吗","context":{},"expect":{"intent":"policy","cited_clause":"RETURN-SEVENDAY-03"},"notes":"政策咨询，期望命中 RETURN-SEVENDAY-03"}
+{"id":"policy-good-standard","category":"policy","path":"policy","input":"什么样算商品完好","context":{},"expect":{"intent":"policy","cited_clause":"RETURN-GOOD-STANDARD-01"},"notes":"政策咨询，期望命中 RETURN-GOOD-STANDARD-01"}
+{"id":"policy-no-sevenday","category":"policy","path":"policy","input":"哪些商品不支持七天无理由","context":{},"expect":{"intent":"policy","cited_clause":"RETURN-EXCEPTION-01"},"notes":"政策咨询，期望命中 RETURN-EXCEPTION-01"}
+{"id":"policy-exchange","category":"policy","path":"policy","input":"换货需要什么条件","context":{},"expect":{"intent":"policy","cited_clause":"AFTERSALE-EXCHANGE-01"},"notes":"政策咨询，期望命中 AFTERSALE-EXCHANGE-01"}
+{"id":"policy-exchange-time","category":"policy","path":"policy","input":"换货多久能完成","context":{},"expect":{"intent":"policy","cited_clause":"AFTERSALE-EXCHANGE-01"},"notes":"政策咨询，期望命中 AFTERSALE-EXCHANGE-01"}
+{"id":"policy-repair","category":"policy","path":"policy","input":"保修怎么申请","context":{},"expect":{"intent":"policy","cited_clause":"AFTERSALE-REPAIR-01"},"notes":"政策咨询，期望命中 AFTERSALE-REPAIR-01"}
+{"id":"policy-invoice","category":"policy","path":"policy","input":"能开发票吗","context":{},"expect":{"intent":"policy","cited_clause":"INVOICE-01"},"notes":"政策咨询，期望命中 INVOICE-01"}
+{"id":"policy-invoice-change","category":"policy","path":"policy","input":"发票开错了能重开吗","context":{},"expect":{"intent":"policy","cited_clause":"INVOICE-01"},"notes":"政策咨询，期望命中 INVOICE-01"}
+{"id":"policy-voucher","category":"policy","path":"policy","input":"售后需要提供什么凭证","context":{},"expect":{"intent":"policy","cited_clause":"INVOICE-02"},"notes":"政策咨询，期望命中 INVOICE-02"}
+{"id":"policy-logistics-delay","category":"policy","path":"policy","input":"超时没发货有赔偿吗","context":{},"expect":{"intent":"policy","cited_clause":"LOGISTICS-01"},"notes":"政策咨询，期望命中 LOGISTICS-01"}
+{"id":"policy-logistics-fake","category":"policy","path":"policy","input":"显示签收但没收到怎么办","context":{},"expect":{"intent":"policy","cited_clause":"LOGISTICS-02"},"notes":"政策咨询，期望命中 LOGISTICS-02"}
+{"id":"policy-logistics-damage","category":"policy","path":"policy","input":"运输中破损了怎么处理","context":{},"expect":{"intent":"policy","cited_clause":"LOGISTICS-03"},"notes":"政策咨询，期望命中 LOGISTICS-03"}
+{"id":"policy-address-rule","category":"policy","path":"policy","input":"还没发货可以改地址吗","context":{},"expect":{"intent":"policy","cited_clause":"ORDER-ADDRESS-01"},"notes":"政策咨询，期望命中 ORDER-ADDRESS-01"}
+{"id":"policy-spec-change","category":"policy","path":"policy","input":"能换颜色换尺码吗","context":{},"expect":{"intent":"policy","cited_clause":"ORDER-ADDRESS-02"},"notes":"政策咨询，期望命中 ORDER-ADDRESS-02"}
+{"id":"policy-presale-deposit","category":"policy","path":"policy","input":"预售定金能退吗","context":{},"expect":{"intent":"policy","cited_clause":"PRESALE-01"},"notes":"政策咨询，期望命中 PRESALE-01"}
+{"id":"policy-presale-ship","category":"policy","path":"policy","input":"预售什么时候发货","context":{},"expect":{"intent":"policy","cited_clause":"PRESALE-02"},"notes":"政策咨询，期望命中 PRESALE-02"}
+{"id":"policy-price-protect","category":"policy","path":"policy","input":"买完降价了能补差价吗","context":{},"expect":{"intent":"policy","cited_clause":"PRICE-PROTECT-01"},"notes":"政策咨询，期望命中 PRICE-PROTECT-01"}
+{"id":"policy-price-time","category":"policy","path":"policy","input":"价保申请有时限吗","context":{},"expect":{"intent":"policy","cited_clause":"PRICE-PROTECT-02"},"notes":"政策咨询，期望命中 PRICE-PROTECT-02"}
+{"id":"policy-crossborder","category":"policy","path":"policy","input":"跨境订单能退吗","context":{},"expect":{"intent":"policy","cited_clause":"CROSSBORDER-01"},"notes":"政策咨询，期望命中 CROSSBORDER-01"}
+{"id":"policy-b2b","category":"policy","path":"policy","input":"企业采购的售后和普通订单一样吗","context":{},"expect":{"intent":"policy","cited_clause":"B2B-01"},"notes":"政策咨询，期望命中 B2B-01"}
+{"id":"policy-tradein-value","category":"policy","path":"policy","input":"以旧换新旧机怎么估价","context":{},"expect":{"intent":"policy","cited_clause":"TRADE-IN-01"},"notes":"政策咨询，期望命中 TRADE-IN-01"}
+{"id":"policy-tradein-after","category":"policy","path":"policy","input":"以旧换新的新机售后怎么算","context":{},"expect":{"intent":"policy","cited_clause":"TRADE-IN-02"},"notes":"政策咨询，期望命中 TRADE-IN-02"}
+{"id":"neg-refund","category":"not_policy","path":"business_action","input":"我要退款","context":{"order_id":"ORD1002"},"expect":{"intent":"refund"},"notes":"业务/澄清意图，不应路由到政策检索"}
+{"id":"neg-logistics","category":"not_policy","path":"business_action","input":"我的快递到哪了","context":{"order_id":"ORD1002"},"expect":{"intent":"logistics"},"notes":"业务/澄清意图，不应路由到政策检索"}
+{"id":"neg-address","category":"not_policy","path":"business_action","input":"帮我改一下地址","context":{"order_id":"ORD1002"},"expect":{"intent":"change_address"},"notes":"业务/澄清意图，不应路由到政策检索"}
+{"id":"neg-order","category":"not_policy","path":"business_action","input":"查一下我的订单","context":{"order_id":"ORD1002"},"expect":{"intent":"query_order"},"notes":"业务/澄清意图，不应路由到政策检索"}
+{"id":"neg-vague","category":"not_policy","path":"business_action","input":"这个东西不好用","context":{"order_id":"ORD1002"},"expect":{"intent":"general"},"notes":"业务/澄清意图，不应路由到政策检索"}

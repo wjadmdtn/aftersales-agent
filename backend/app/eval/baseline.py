@@ -33,6 +33,8 @@ THRESHOLDS: dict[str, Threshold] = {
     "过度转接率": Threshold("increase", 0.05),
     "转人工漏转率": Threshold("increase", 0.05),
     "转人工误转率": Threshold("increase", 0.05),
+    "政策问答准确率": Threshold("decrease", 0.05),
+    "政策误路由率": Threshold("increase", 0.05),
     # 硬性项：零容忍
     "话术承诺泄露": Threshold("increase", 0.0),
     "静默违规": Threshold("increase", 0.0),

@@ -15,6 +15,7 @@ class EvalPath(StrEnum):
     HANDOFF = "handoff"
     IRRELEVANT = "irrelevant"
     E2E = "e2e"
+    POLICY = "policy"
 
 
 class EvalCase(BaseModel):
@@ -44,6 +45,7 @@ class EvalCase(BaseModel):
             EvalPath.HANDOFF: {"triggered"},
             EvalPath.IRRELEVANT: {"state"},
             EvalPath.E2E: {"order_status"},
+            EvalPath.POLICY: {"intent"},
         }[self.path]
         missing = required - set(self.expect)
         if missing:
