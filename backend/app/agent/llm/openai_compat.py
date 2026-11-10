@@ -12,6 +12,7 @@ import httpx
 from app.agent.llm.base import LLMError
 from app.config import settings
 from app.models.agent import Intent, IntentMode, IntentResult
+from app.policy.models import PolicyAnswer, RetrievalDecision, RetrievalResult
 
 _POLICY_SYSTEM_PROMPT = """你是客服政策问答助手。只能依据下面提供的【条款】回答，不得使用常识、
 行业惯例或任何未列出的信息。只输出 JSON。
@@ -143,3 +144,46 @@ class OpenAICompatLLMClient:
             reason=data.get("reason"),
         )
 
+    async def answer_policy(
+        self, *, user_input: str, retrieval: RetrievalResult
+    ) -> PolicyAnswer:
+        if not retrieval.candidates:
+            return PolicyAnswer(decision=RetrievalDecision.MISS)
+
+        user_block = (
+            f"用户问题：{user_input}\n\n【条款】\n{_format_clauses(retrieval)}"
+        )
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": _POLICY_SYSTEM_PROMPT},
+                {"role": "user", "content": user_block},
+            ],
+            "temperature": 0,
+            "response_format": {"type": "json_object"},
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout_ms / 1000) as client:
+                resp = await client.post(
+                    f"{self.base_url}/chat/completions",
+                    json=payload,
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                )
+                resp.raise_for_status()
+                content = resp.json()["choices"][0]["message"]["content"]
+        except (httpx.HTTPError, KeyError, IndexError) as e:
+            raise LLMError(f"llm policy call failed: {e}") from e
+
+        try:
+            data = json.loads(content)
+            decision = RetrievalDecision(data.get("decision", "miss"))
+            return PolicyAnswer(
+                decision=decision,
+                answer=str(data.get("answer") or ""),
+                cited_clause_ids=[str(x) for x in (data.get("cited_clause_ids") or [])],
+                handled_exceptions=[str(x) for x in (data.get("handled_exceptions") or [])],
+                ambiguity_question=data.get("ambiguity_question"),
+            )
+        except (json.JSONDecodeError, ValueError) as e:
+            raise LLMError(f"llm policy returned invalid structure: {e}") from e

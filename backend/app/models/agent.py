@@ -95,6 +95,9 @@ class SessionState(BaseModel):
     intent: Intent | None = None
     turn_count: int = 0
     clarify_round: int = 0
+    # 政策检索：最近一次引用的条款（多轮追问用）与发生检索的轮次数（评测用）
+    last_cited_clause_ids: list[str] = Field(default_factory=list)
+    policy_turns: int = 0
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 

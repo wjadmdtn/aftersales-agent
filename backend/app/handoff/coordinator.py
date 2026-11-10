@@ -45,6 +45,7 @@ class HandoffCoordinator:
         last_tool_status: ToolStatus | None = None,
         tool_failure_streak: int = 0,
         llm_cannot_handle: bool = False,
+        rag_top_similarity: float | None = None,
     ) -> TriggerResult:
         signals = TurnSignals(
             user_message=user_message,
@@ -52,6 +53,7 @@ class HandoffCoordinator:
             last_tool_status=last_tool_status,
             tool_failure_streak=tool_failure_streak,
             llm_cannot_handle=llm_cannot_handle,
+            rag_top_similarity=rag_top_similarity,
         )
         return triggers.evaluate(signals, self.cfg)
 

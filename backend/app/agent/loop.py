@@ -17,6 +17,7 @@ from __future__ import annotations
 import re
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
@@ -36,6 +37,7 @@ from app.models.agent import (
     TurnRecord,
 )
 from app.models.enums import ResultCode
+from app.policy.models import RetrievalDecision
 
 # 与种子数据一致：ORD + 至少 4 位数字
 ORDER_ID_PATTERN = re.compile(r"ORD\d{4,}")
@@ -61,11 +63,13 @@ class AgentLoop:
         sessions: SessionStore,
         tools: MockServiceClient,
         coordinator=None,
+        policy=None,
     ):
         self.classifier = classifier
         self.sessions = sessions
         self.tools = tools
         self.coordinator = coordinator
+        self.policy = policy
 
     async def handle(
         self,
@@ -132,6 +136,8 @@ class AgentLoop:
     async def _handle_degraded(
         self, state: SessionState, message: str, error: Exception | None, *, trace_id: str
     ) -> AgentReply:
+        # 降级期**不走政策检索**：LLM 不可用时生成阶段最容易产生幻觉，
+        # 用模板或规则拼一个政策回答等于绕过了引用与例外门禁。
         kind = degrade.classify_degraded(message)
         if kind == degrade.WRITE_SUSPECTED:
             return AgentReply(
@@ -213,9 +219,58 @@ class AgentLoop:
                 state, message, primary_intent="complaint", trace_id=trace_id
             )
 
+        # 政策问题天然是兜底路径：先检索，答不了再澄清。
+        # 澄清是"没听懂"，检索是"听懂了但不是我该执行的事"——顺序反了会答非所问。
+        policy_reply = await self._try_policy(state, message, trace_id=trace_id)
+        if policy_reply is not None:
+            return policy_reply
+
         # 无法识别可调用的工具：澄清优先，转人工是最后手段。
         # "AI 一时没理解"不等于"用户需要人工"——直接转会把人工成本吃光。
         return await self._clarify(state, message, trace_id=trace_id)
+
+    async def _try_policy(
+        self, state: SessionState, message: str, *, trace_id: str
+    ) -> AgentReply | None:
+        """检索命中则直接回答；未命中返回 None，交回澄清链路。"""
+        if self.policy is None:
+            return None
+
+        order_created_at = None
+        product_type = None
+        if state.order_id:
+            body = await self.tools.get_order(state.order_id, trace_id=trace_id)
+            if body.get("code") == ResultCode.OK:
+                order = body.get("data") or {}
+                order_created_at = _parse_dt(order.get("created_at"))
+                product_type = order.get("product_type")
+
+        answer, _retrieval = await self.policy.answer(
+            question=message,
+            order_created_at=order_created_at,
+            product_type=product_type,
+            trace_id=trace_id,
+        )
+
+        if answer.decision is RetrievalDecision.AMBIGUOUS:
+            state.clarify_round += 1
+            return AgentReply(
+                reply=answer.ambiguity_question or "您能再具体说一下是想问哪方面吗？",
+                intent=None,
+                state="clarifying",
+            )
+
+        if answer.decision is RetrievalDecision.MISS or not answer.answer:
+            return None
+
+        state.last_cited_clause_ids = list(answer.cited_clause_ids)
+        state.policy_turns += 1
+        return AgentReply(
+            reply=answer.answer,
+            intent=Intent.GENERAL,
+            tool_calls=["policy.search"],
+            state="policy_answered",
+        )
 
     CLARIFY_ROUND_LIMIT = 2
 
@@ -427,6 +482,17 @@ class AgentLoop:
             tool_calls=["address.update"],
             state="executed",
         )
+
+
+def _parse_dt(value):
+    if not value:
+        return None
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    return value
 
 
 def to_turn(turn: int, message: str, reply: AgentReply) -> TurnRecord:

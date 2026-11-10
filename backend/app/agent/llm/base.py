@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import Any, Protocol, runtime_checkable
 
 from app.models.agent import IntentResult
+from app.policy.models import PolicyAnswer, RetrievalResult
 
 
 class LLMError(RuntimeError):
@@ -14,7 +15,7 @@ class LLMError(RuntimeError):
 
 
 @runtime_checkable
-class LLMClient(Protocol):
+class IntentLLM(Protocol):
     async def classify(
         self,
         *,
@@ -28,3 +29,23 @@ class LLMClient(Protocol):
         同样的词在不同语境下含义相反（威胁 / 咨询 / 历史陈述 / 诉求）。
         """
         ...
+
+
+@runtime_checkable
+class PolicyLLM(Protocol):
+    async def answer_policy(
+        self,
+        *,
+        user_input: str,
+        retrieval: RetrievalResult,
+    ) -> PolicyAnswer:
+        """基于召回条款生成结构化回答。
+
+        实现方只能把决策降级（hit → ambiguous/miss），不得把 miss 升级为 hit：
+        否则"检索不到就不答"的边界会被模型的必答倾向吃掉。
+        """
+        ...
+
+
+# 兼容既有导入
+LLMClient = IntentLLM

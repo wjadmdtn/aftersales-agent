@@ -50,10 +50,15 @@ def configure_agent(
     sessions: SessionStore,
     tools: MockServiceClient,
     coordinator=None,
+    policy=None,
 ) -> None:
     global _loop
     _loop = AgentLoop(
-        classifier=classifier, sessions=sessions, tools=tools, coordinator=coordinator
+        classifier=classifier,
+        sessions=sessions,
+        tools=tools,
+        coordinator=coordinator,
+        policy=policy,
     )
 
 

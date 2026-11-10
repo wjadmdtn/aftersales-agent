@@ -58,6 +58,17 @@ class Settings(BaseSettings):
     negative_keywords_raw: str = Field(default='["不满意","生气","失望","麻烦","怎么回事","不好用","不好使","用不了","有问题","坏了","划痕","破损","质量差","太慢","等太久","和图片不一样","是坏的","废品","完全不能用","等半天","效率太低","让人无语","不太行","质量不行","跟描述","不一样"]')
     tool_failure_threshold: int = Field(default=3, ge=1)
     rag_similarity_threshold: float = Field(default=0.6, ge=0, le=1)
+
+    # --- policy rag (feature 005) ---
+    policy_seed_path: str = "seed/policies/policies.json"
+    policy_enabled: bool = True
+    rag_recall_top_k: int = Field(default=5, ge=1)
+    rag_rerank_top_n: int = Field(default=2, ge=1)
+    rag_ambiguity_margin: float = Field(default=0.05, ge=0, le=1)
+    rag_timeout_ms: int = Field(default=800, gt=0)
+    rag_embedder: str = "stub"
+    rag_embedding_dim: int = Field(default=1024, ge=8)
+
     handoff_scripts_raw: str = Field(
         default="""{
   "user_request": "好的，正在为您接入人工客服，请稍候。",

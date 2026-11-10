@@ -28,6 +28,9 @@ class _SeedOrder(BaseModel):
     amount: Decimal
     address: Address
     logistics: _SeedLogistics | None = None
+    # 缺失时回落到启动时刻：政策检索按 created_at 选版本，不填就无法做版本过滤
+    created_at: datetime | None = None
+    product_type: str | None = None
 
 
 @dataclass
@@ -70,7 +73,8 @@ def load_seed(path: str | Path) -> SeedData:
             status=seed_order.status,
             amount=seed_order.amount,
             address=seed_order.address,
-            created_at=datetime.now(timezone.utc),
+            product_type=seed_order.product_type,
+            created_at=seed_order.created_at or datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
         )
 
