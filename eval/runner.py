@@ -93,8 +93,17 @@ class RecordingLLM:
             self.calls += 1
             self.seconds += time.perf_counter() - start
 
+    async def answer_policy(self, *, user_input, retrieval):
+        """政策问答也要代理。漏了这个，政策链路会静默降级为 miss。"""
+        start = time.perf_counter()
+        try:
+            return await self.inner.answer_policy(user_input=user_input, retrieval=retrieval)
+        finally:
+            self.calls += 1
+            self.seconds += time.perf_counter() - start
 
-async def build_env(backend: str, model: str | None):
+
+async def build_env(backend: str, model: str | None, embedder: str = "stub"):
     mock_routes.reset_store()
     mock_app = create_app()
 
@@ -110,10 +119,17 @@ async def build_env(backend: str, model: str | None):
 
         llm = StubLLMClient(classifier=_stub_classifier)
 
+    # 政策服务必须显式装配，否则 POLICY 意图走不到检索，政策用例恒为 0
+    policy = _build_eval_policy(llm, embedder)
+
     classifier = IntentClassifier(llm, keyword_map={})
     coordinator = HandoffCoordinator(HandoffQueue(redis))
     agent_routes.configure_agent(
-        classifier=classifier, sessions=store, tools=tools, coordinator=coordinator
+        classifier=classifier,
+        sessions=store,
+        tools=tools,
+        coordinator=coordinator,
+        policy=policy,
     )
 
     agent_app = create_app()
@@ -121,8 +137,49 @@ async def build_env(backend: str, model: str | None):
     return client, mock_app, redis, llm, store
 
 
+def _build_eval_policy(llm, embedder: str):
+    from app.config import settings
+    from app.policy.embedder import build_embedder
+    from app.policy.seed import load_policies
+    from app.policy.store import InMemoryClauseStore
+    from app.policy.retriever import Retriever
+    from app.services.policy import PolicyService
+
+    em = build_embedder(embedder, settings.rag_embedding_dim)
+    clauses = load_policies(settings.policy_seed_path)
+    store = InMemoryClauseStore(clauses, em)
+
+    if embedder == "stub":
+        # 桩向量尺度在 0.0~0.1，用真实阈值会全程 miss。这里放行 top1，只测链路。
+        threshold, margin = 0.0, 0.0
+    else:
+        threshold, margin = settings.rag_similarity_threshold, settings.rag_ambiguity_margin
+
+    retriever = Retriever(
+        store=store,
+        embedder=em,
+        similarity_threshold=threshold,
+        ambiguity_margin=margin,
+        top_k=settings.rag_recall_top_k,
+    )
+    return PolicyService(retriever=retriever, llm=llm, timeout_ms=settings.rag_timeout_ms)
+
+
 def _stub_classifier(text: str) -> IntentResult:
-    """桩：按关键词返回。仅用于验证链路，准确率不代表真实效果。"""
+    """桩：按关键词返回。仅用于验证链路，准确率不代表真实效果。
+
+    顺序即优先级：先判「问规则」的政策特征，再判动作。
+    "退款多久能到账" 含「退款」但问的是规则，必须先命中 policy。
+    """
+    policy_markers = (
+        "多久", "几天", "怎么算", "谁出", "谁承担", "范围", "哪些", "标准", "政策",
+        "规则", "条件", "时限", "时效", "能退吗", "能不能退", "可以退吗", "能开",
+        "能换", "保修", "价保", "七天无理由", "定金", "以旧换新", "凭证",
+        "赔偿", "赔付", "退不退", "算不算", "属于", "怎么样算", "不符合",
+    )
+    if any(m in text for m in policy_markers):
+        return IntentResult(intent=Intent.POLICY, confidence=0.9)
+
     table = [
         (("转人工", "人工", "真人", "客服电话"), Intent.MANUAL),
         (("投诉", "差评", "骗子", "起诉", "举报", "12315"), Intent.COMPLAINT),
@@ -130,7 +187,6 @@ def _stub_classifier(text: str) -> IntentResult:
         (("物流", "快递", "包裹", "到哪", "发货"), Intent.LOGISTICS),
         (("地址",), Intent.CHANGE_ADDRESS),
         (("订单",), Intent.QUERY_ORDER),
-        (("发票", "保修", "价保", "七天无理由", "定金", "以旧换新", "凭证"), Intent.POLICY),
     ]
     for words, intent in table:
         if any(w in text for w in words):
@@ -233,7 +289,7 @@ async def run_case(client, mock_app, case: EvalCase, trace: str) -> dict:
 
 async def main_async(args) -> int:
     cases = load_dir(CASES_DIR)
-    client, mock_app, redis, llm, store = await build_env(args.llm, args.model)
+    client, mock_app, redis, llm, store = await build_env(args.llm, args.model, args.embedder)
 
     results = []
     started = time.perf_counter()
@@ -289,6 +345,12 @@ def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--llm", choices=["stub", "real"], default="stub")
     p.add_argument("--model", default=None)
+    p.add_argument(
+        "--embedder",
+        choices=["stub", "bge"],
+        default="stub",
+        help="bge 才真正测检索质量；stub 只验证接线，政策用例数字不可对外引用",
+    )
     p.add_argument("--update-baseline", action="store_true")
     p.add_argument("--no-baseline", action="store_true")
     return asyncio.run(main_async(p.parse_args()))

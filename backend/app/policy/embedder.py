@@ -45,17 +45,23 @@ class StubEmbedder:
 
 
 class BgeEmbedder:
-    """bge-m3 本地推理。仅在本地/生产使用，CI 用 StubEmbedder。"""
+    """bge 系列本地推理。仅在本地/生产使用，CI 用 StubEmbedder。
 
-    def __init__(self, model_name: str = "BAAI/bge-m3", dim: int = 1024):
+    dim 由模型决定，不要沿用外部传入值——传错维度会让 pgvector 建出错误的表。
+    默认用 bge-small-zh-v1.5：m3 在 hf-mirror 上动辄限流、体积 2.2GB，
+    而 short-zh 在中文短问句上召回与 m3 相当，换模型必须重跑标定。
+    """
+
+    def __init__(self, model_name: str = "BAAI/bge-small-zh-v1.5"):
         try:
             from sentence_transformers import SentenceTransformer
         except ImportError as e:  # pragma: no cover - 只在真模型环境触发
             raise RuntimeError(
                 "sentence-transformers not installed; use rag_embedder=stub or pip install it"
             ) from e
+        self.model_name = model_name
         self._model = SentenceTransformer(model_name)
-        self.dim = dim
+        self.dim = self._model.get_sentence_embedding_dimension()
 
     def embed(self, texts: list[str]) -> list[list[float]]:  # pragma: no cover
         vecs = self._model.encode(texts, normalize_embeddings=True)
@@ -66,7 +72,7 @@ def build_embedder(kind: str, dim: int) -> Embedder:
     if kind == "stub":
         return StubEmbedder(dim)
     if kind == "bge":
-        return BgeEmbedder(dim=dim)
+        return BgeEmbedder()
     raise ValueError(f"unknown embedder: {kind}")
 
 

@@ -1,45 +1,29 @@
-"""T015: 降级路径的宽写词表。"""
+"""降级：统一话术，不猜意图。
 
-import pytest
+早先用关键词判读写，结果「退款多久能到账」被当写操作拒掉，
+而「钱能回来吗」被放行——两个判断都不可靠。
+现在只有一条路：重试耗尽 → 统一话术 + 引导转人工。
+"""
 
-from app.agent import degrade
-from app.config import settings
-
-
-def test_write_keyword_hit():
-    for text in ["我要退款", "帮我改地址", "取消订单", "申请退"]:
-        assert degrade.classify_degraded(text) == degrade.WRITE_SUSPECTED, text
+from app.agent.degrade import DEGRADED_REPLY, degraded_reply
 
 
-def test_read_passes_when_no_write_word():
-    for text in ["到哪了", "查一下", "怎么样了"]:
-        assert degrade.classify_degraded(text) == degrade.READ, text
+def test_returns_uniform_script():
+    assert degraded_reply() == DEGRADED_REPLY
 
 
-def test_degrade_table_is_wider_than_normal():
-    """FR-014a：降级词表必须比正常词表更宽，宁可误拒只读。"""
-    normal = set()
-    for words in settings.keyword_hints.values():
-        normal.update(words)
-
-    degrade_kws = set(settings.degrade_write_keywords)
-
-    # 正常词表若为空（未配置），至少断言降级表覆盖了核心写操作词
-    assert {"退款", "退", "改", "修改"} <= degrade_kws
-    for core in ["退款", "退", "退货"]:
-        assert core in degrade_kws
+def test_script_mentions_retry_and_human():
+    assert "稍后再试" in DEGRADED_REPLY
+    assert "人工" in DEGRADED_REPLY
 
 
-def test_single_char_broadening_catches_partial():
-    """"把那个退掉" 含"退"，正常词表没有这个单独的字，降级表要能拦住。"""
-    assert degrade.classify_degraded("把那个退掉") == degrade.WRITE_SUSPECTED
+def test_script_makes_no_promise():
+    """降级话术不得暗示能处理、不得承诺时效。"""
+    for word in ("退款", "退换", "补发", "补偿", "马上", "立即", "分钟", "小时"):
+        assert word not in DEGRADED_REPLY, word
 
 
-def test_custom_keywords_override():
-    assert degrade.classify_degraded("我要退款", write_keywords=()) == degrade.READ
-
-
-def test_false_negative_is_acceptable_cost():
-    """未命中写词表 → 放行只读。最坏结果只是多查一次只读数据。"""
-    # "这个能不能退" 含"退"，命中；"钱能回来吗" 不含，放行
-    assert degrade.classify_degraded("钱能回来吗") == degrade.READ
+def test_script_does_not_guess_user_intent():
+    """不推测用户想干什么——此刻判断意图正是不可用的能力。"""
+    for word in ("您是想", "您要", "请问您"):
+        assert word not in DEGRADED_REPLY, word

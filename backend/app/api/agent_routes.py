@@ -95,3 +95,24 @@ async def chat(req: ChatRequest, request: Request) -> ChatResponse:
         state=result.state,
         trace_id=trace_id,
     )
+
+
+@router.get("/health/llm")
+async def llm_health() -> dict:
+    """LLM 调用的健康指标，供告警系统拉取。
+
+    failure_rate 持续高于阈值、或 recent_failures 在短时间内激增，
+    说明 LLM 链路出问题，应触发告警。
+    """
+    from app.agent.resilience import stats
+
+    return {
+        "total_calls": stats.total_calls,
+        "total_attempts": stats.total_attempts,
+        "successes": stats.successes,
+        "failures": stats.failures,
+        "failure_rate": round(stats.failure_rate, 4),
+        "retry_rate": round(stats.retry_rate, 4),
+        "failures_last_10min": len(stats.recent_failures),
+        "degraded": stats.total_calls > 0 and stats.failure_rate > 0.2,
+    }

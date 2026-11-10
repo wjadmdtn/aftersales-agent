@@ -14,6 +14,7 @@
 """
 from __future__ import annotations
 
+import logging
 import re
 import uuid
 from dataclasses import dataclass, field
@@ -38,6 +39,8 @@ from app.models.agent import (
 )
 from app.models.enums import ResultCode
 from app.policy.models import RetrievalDecision
+
+logger = logging.getLogger(__name__)
 
 # 与种子数据一致：ORD + 至少 4 位数字
 ORDER_ID_PATTERN = re.compile(r"ORD\d{4,}")
@@ -136,30 +139,17 @@ class AgentLoop:
     async def _handle_degraded(
         self, state: SessionState, message: str, error: Exception | None, *, trace_id: str
     ) -> AgentReply:
-        # 降级期**不走政策检索**：LLM 不可用时生成阶段最容易产生幻觉，
-        # 用模板或规则拼一个政策回答等于绕过了引用与例外门禁。
-        kind = degrade.classify_degraded(message)
-        if kind == degrade.WRITE_SUSPECTED:
-            return AgentReply(
-                reply=degrade.DEGRADED_WRITE_REPLY,
-                source=IntentSource.DEGRADED,
-                state="degraded_write_blocked",
-            )
+        """重试耗尽后的降级：统一话术，不猜意图。
 
-        # 只读放行：有绑定订单就帮他查一下，没有就给通用话术
-        if state.order_id:
-            body = await self.tools.get_order(state.order_id, trace_id=trace_id)
-            rendered = present.render(body)
-            return AgentReply(
-                reply=f"{degrade.degraded_read_reply(True)}\n{rendered}",
-                source=IntentSource.DEGRADED,
-                tool_calls=["order.get"],
-                state="degraded_read",
-            )
+        不做读写区分——区分本身就要求判断意图，而意图判断正是此刻不可用的能力。
+        """
+        logger.error(
+            "llm unavailable, degraded trace_id=%s err=%s", trace_id, type(error).__name__ if error else "?"
+        )
         return AgentReply(
-            reply=degrade.degraded_read_reply(False),
+            reply=degrade.degraded_reply(),
             source=IntentSource.DEGRADED,
-            state="degraded_read",
+            state="degraded",
         )
 
     # ---------- 订单切换 ----------

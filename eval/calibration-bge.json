@@ -1,0 +1,1108 @@
+{
+ "embedder": "bge",
+ "threshold": 0.64,
+ "margin": 0.0,
+ "positives": [
+  {
+   "query": "退款一般多久到账啊",
+   "expected": "REFUND-COMMON-01",
+   "top1": 0.7560107659882332,
+   "top2": 0.6973829762813967,
+   "top1_clause": "REFUND-COMMON-01"
+  },
+  {
+   "query": "钱什么时候退回来",
+   "expected": "REFUND-COMMON-01",
+   "top1": 0.6173918139777036,
+   "top2": 0.5716672195348026,
+   "top1_clause": "REFUND-COMMON-01"
+  },
+  {
+   "query": "退了款什么时候能收到",
+   "expected": "REFUND-COMMON-01",
+   "top1": 0.6744675112378812,
+   "top2": 0.6601618037196498,
+   "top1_clause": "REFUND-COMMON-01"
+  },
+  {
+   "query": "退款走银行卡要几天",
+   "expected": "REFUND-COMMON-01",
+   "top1": 0.7198645173831435,
+   "top2": 0.6482061097786871,
+   "top1_clause": "REFUND-COMMON-01"
+  },
+  {
+   "query": "退款到账时间是多久",
+   "expected": "REFUND-COMMON-01",
+   "top1": 0.7670289789591429,
+   "top2": 0.6910747278066688,
+   "top1_clause": "REFUND-COMMON-01"
+  },
+  {
+   "query": "我申请退款了钱多久能到",
+   "expected": "REFUND-COMMON-01",
+   "top1": 0.6795208227318544,
+   "top2": 0.6791972839535452,
+   "top1_clause": "REFUND-COMMON-04"
+  },
+  {
+   "query": "退款金额是怎么算出来的",
+   "expected": "REFUND-COMMON-02",
+   "top1": 0.8022933255896579,
+   "top2": 0.6550256985193459,
+   "top1_clause": "REFUND-COMMON-02"
+  },
+  {
+   "query": "退款能退多少钱",
+   "expected": "REFUND-COMMON-02",
+   "top1": 0.7349745149413149,
+   "top2": 0.6337416788996999,
+   "top1_clause": "REFUND-COMMON-02"
+  },
+  {
+   "query": "退的钱包不包括运费",
+   "expected": "REFUND-COMMON-02",
+   "top1": 0.7073733026992433,
+   "top2": 0.6465374350210741,
+   "top1_clause": "REFUND-COMMON-03"
+  },
+  {
+   "query": "退款是不是扣了手续费",
+   "expected": "REFUND-COMMON-02",
+   "top1": 0.6528679485899783,
+   "top2": 0.647909486919574,
+   "top1_clause": "REFUND-COMMON-01"
+  },
+  {
+   "query": "退货运费退吗",
+   "expected": "REFUND-COMMON-03",
+   "top1": 0.792816723979328,
+   "top2": 0.7128268499707292,
+   "top1_clause": "REFUND-COMMON-03"
+  },
+  {
+   "query": "寄回去的快递费谁承担",
+   "expected": "REFUND-COMMON-03",
+   "top1": 0.5902463887053193,
+   "top2": 0.5837008509806053,
+   "top1_clause": "RETURN-SEVENDAY-03"
+  },
+  {
+   "query": "退货的邮费能报销吗",
+   "expected": "REFUND-COMMON-03",
+   "top1": 0.6667419869871497,
+   "top2": 0.6433292022422168,
+   "top1_clause": "REFUND-COMMON-03"
+  },
+  {
+   "query": "运费退不退给我",
+   "expected": "REFUND-COMMON-03",
+   "top1": 0.7533822245821972,
+   "top2": 0.7052705491089998,
+   "top1_clause": "REFUND-COMMON-03"
+  },
+  {
+   "query": "商家迟迟不给我退款",
+   "expected": "REFUND-COMMON-04",
+   "top1": 0.7530142920177715,
+   "top2": 0.6680673535645238,
+   "top1_clause": "REFUND-COMMON-04"
+  },
+  {
+   "query": "申请退款商家一直不处理",
+   "expected": "REFUND-COMMON-04",
+   "top1": 0.7606588836960105,
+   "top2": 0.6826749840749441,
+   "top1_clause": "REFUND-COMMON-04"
+  },
+  {
+   "query": "退款一直卡在审核怎么办",
+   "expected": "REFUND-COMMON-04",
+   "top1": 0.6981211781927196,
+   "top2": 0.6591666920288213,
+   "top1_clause": "REFUND-COMMON-01"
+  },
+  {
+   "query": "卖家拖着不退款可以投诉吗",
+   "expected": "REFUND-COMMON-04",
+   "top1": 0.7174367289876449,
+   "top2": 0.6656584351658889,
+   "top1_clause": "REFUND-COMMON-04"
+  },
+  {
+   "query": "哪些东西能七天无理由",
+   "expected": "RETURN-SEVENDAY-01",
+   "top1": 0.7058917532126676,
+   "top2": 0.6551001908110449,
+   "top1_clause": "RETURN-SEVENDAY-01"
+  },
+  {
+   "query": "七天无理由退货适用范围",
+   "expected": "RETURN-SEVENDAY-01",
+   "top1": 0.8612718363035456,
+   "top2": 0.7784667052221023,
+   "top1_clause": "RETURN-SEVENDAY-01"
+  },
+  {
+   "query": "是不是所有商品都支持七天无理由",
+   "expected": "RETURN-SEVENDAY-01",
+   "top1": 0.7644693871984697,
+   "top2": 0.6997123924315206,
+   "top1_clause": "RETURN-SEVENDAY-01"
+  },
+  {
+   "query": "什么商品可以无理由退",
+   "expected": "RETURN-SEVENDAY-01",
+   "top1": 0.7308490181720955,
+   "top2": 0.7206173740796783,
+   "top1_clause": "RETURN-SEVENDAY-03"
+  },
+  {
+   "query": "七天无理由是从签收开始算吗",
+   "expected": "RETURN-SEVENDAY-02",
+   "top1": 0.7687190936499425,
+   "top2": 0.7430991352711901,
+   "top1_clause": "RETURN-SEVENDAY-02"
+  },
+  {
+   "query": "七天无理由怎么算第一天",
+   "expected": "RETURN-SEVENDAY-02",
+   "top1": 0.7176423348200972,
+   "top2": 0.6988941957997904,
+   "top1_clause": "RETURN-SEVENDAY-01"
+  },
+  {
+   "query": "无理由退货的七天从哪天起",
+   "expected": "RETURN-SEVENDAY-02",
+   "top1": 0.8428937125314425,
+   "top2": 0.7834504808752313,
+   "top1_clause": "RETURN-SEVENDAY-01"
+  },
+  {
+   "query": "超了七天还能无理由退吗",
+   "expected": "RETURN-SEVENDAY-02",
+   "top1": 0.7529021448693861,
+   "top2": 0.7275469364610986,
+   "top1_clause": "RETURN-SEVENDAY-01"
+  },
+  {
+   "query": "七天无理由退货运费谁付",
+   "expected": "RETURN-SEVENDAY-03",
+   "top1": 0.8415607487264752,
+   "top2": 0.7616991901203694,
+   "top1_clause": "RETURN-SEVENDAY-03"
+  },
+  {
+   "query": "无理由退货运费我出还是商家出",
+   "expected": "RETURN-SEVENDAY-03",
+   "top1": 0.7641438333211075,
+   "top2": 0.7600005203897264,
+   "top1_clause": "RETURN-SEVENDAY-03"
+  },
+  {
+   "query": "七天无理由退货运费怎么算",
+   "expected": "RETURN-SEVENDAY-03",
+   "top1": 0.8364587614074612,
+   "top2": 0.7837534428763743,
+   "top1_clause": "RETURN-SEVENDAY-03"
+  },
+  {
+   "query": "赠品需要退回去吗",
+   "expected": "RETURN-SEVENDAY-03",
+   "top1": 0.693309298794699,
+   "top2": 0.6212005175561325,
+   "top1_clause": "RETURN-SEVENDAY-03"
+  },
+  {
+   "query": "退货的时候赠品要一起寄回吗",
+   "expected": "RETURN-SEVENDAY-03",
+   "top1": 0.7108526537943299,
+   "top2": 0.6462965179542274,
+   "top1_clause": "RETURN-SEVENDAY-03"
+  },
+  {
+   "query": "怎么才算商品完好",
+   "expected": "RETURN-GOOD-STANDARD-01",
+   "top1": 0.6674606051141271,
+   "top2": 0.5500386516060766,
+   "top1_clause": "RETURN-GOOD-STANDARD-01"
+  },
+  {
+   "query": "退货商品完好的标准是什么",
+   "expected": "RETURN-GOOD-STANDARD-01",
+   "top1": 0.7054989443684205,
+   "top2": 0.6163650694346484,
+   "top1_clause": "RETURN-GOOD-STANDARD-01"
+  },
+  {
+   "query": "吊牌剪了还能退吗",
+   "expected": "RETURN-GOOD-STANDARD-01",
+   "top1": 0.5625984369524618,
+   "top2": 0.5269591776842731,
+   "top1_clause": "AFTERSALE-EXCHANGE-01"
+  },
+  {
+   "query": "包装拆了算不算影响二次销售",
+   "expected": "RETURN-GOOD-STANDARD-01",
+   "top1": 0.6001079166790098,
+   "top2": 0.5925800366435079,
+   "top1_clause": "AFTERSALE-EXCHANGE-01"
+  },
+  {
+   "query": "试穿过的衣服能退吗",
+   "expected": "RETURN-GOOD-STANDARD-01",
+   "top1": 0.5239748923842348,
+   "top2": 0.5198672564142325,
+   "top1_clause": "RETURN-GOOD-STANDARD-01"
+  },
+  {
+   "query": "哪些商品不能七天无理由",
+   "expected": "RETURN-EXCEPTION-01",
+   "top1": 0.7960350100845136,
+   "top2": 0.7718079931876465,
+   "top1_clause": "RETURN-EXCEPTION-01"
+  },
+  {
+   "query": "哪些不支持无理由退货",
+   "expected": "RETURN-EXCEPTION-01",
+   "top1": 0.7341897768080416,
+   "top2": 0.721016640697314,
+   "top1_clause": "RETURN-EXCEPTION-01"
+  },
+  {
+   "query": "生鲜可以不支持退货吗",
+   "expected": "RETURN-EXCEPTION-01",
+   "top1": 0.6183999650004909,
+   "top2": 0.6035460128791118,
+   "top1_clause": "RETURN-EXCEPTION-01"
+  },
+  {
+   "query": "定制的东西能无理由退吗",
+   "expected": "RETURN-EXCEPTION-01",
+   "top1": 0.7013187025638377,
+   "top2": 0.6209995077601037,
+   "top1_clause": "RETURN-EXCEPTION-01"
+  },
+  {
+   "query": "拆封的数码产品能退吗",
+   "expected": "RETURN-EXCEPTION-01",
+   "top1": 0.590670661891216,
+   "top2": 0.5807515214172044,
+   "top1_clause": "ORDER-ADDRESS-02"
+  },
+  {
+   "query": "换货有什么条件",
+   "expected": "AFTERSALE-EXCHANGE-01",
+   "top1": 0.7634314173905248,
+   "top2": 0.6388351293159618,
+   "top1_clause": "AFTERSALE-EXCHANGE-01"
+  },
+  {
+   "query": "什么情况可以换货",
+   "expected": "AFTERSALE-EXCHANGE-01",
+   "top1": 0.751485689059321,
+   "top2": 0.6534258091787286,
+   "top1_clause": "AFTERSALE-EXCHANGE-01"
+  },
+  {
+   "query": "换货要多久",
+   "expected": "AFTERSALE-EXCHANGE-01",
+   "top1": 0.7609065881521672,
+   "top2": 0.6546461793040825,
+   "top1_clause": "AFTERSALE-EXCHANGE-01"
+  },
+  {
+   "query": "换货运费谁出",
+   "expected": "AFTERSALE-EXCHANGE-01",
+   "top1": 0.6103960984208793,
+   "top2": 0.5861542242693245,
+   "top1_clause": "AFTERSALE-EXCHANGE-01"
+  },
+  {
+   "query": "换货流程是怎样的",
+   "expected": "AFTERSALE-EXCHANGE-01",
+   "top1": 0.7331774881163042,
+   "top2": 0.6347360936478709,
+   "top1_clause": "AFTERSALE-EXCHANGE-01"
+  },
+  {
+   "query": "保修怎么申请",
+   "expected": "AFTERSALE-REPAIR-01",
+   "top1": 0.6525261582520613,
+   "top2": 0.6061485328419851,
+   "top1_clause": "AFTERSALE-REPAIR-01"
+  },
+  {
+   "query": "东西坏了能保修吗",
+   "expected": "AFTERSALE-REPAIR-01",
+   "top1": 0.7207899158278214,
+   "top2": 0.6092482082423666,
+   "top1_clause": "AFTERSALE-REPAIR-01"
+  },
+  {
+   "query": "保修期是多长",
+   "expected": "AFTERSALE-REPAIR-01",
+   "top1": 0.721861825099148,
+   "top2": 0.5973174532711797,
+   "top1_clause": "AFTERSALE-REPAIR-01"
+  },
+  {
+   "query": "维修要花钱吗",
+   "expected": "AFTERSALE-REPAIR-01",
+   "top1": 0.5785426846948356,
+   "top2": 0.48624245512812064,
+   "top1_clause": "AFTERSALE-REPAIR-01"
+  },
+  {
+   "query": "怎么送修",
+   "expected": "AFTERSALE-REPAIR-01",
+   "top1": 0.5403020758337485,
+   "top2": 0.5313029356846704,
+   "top1_clause": "AFTERSALE-EXCHANGE-01"
+  },
+  {
+   "query": "能开增值税发票吗",
+   "expected": "INVOICE-01",
+   "top1": 0.6870823456734363,
+   "top2": 0.5089076787747061,
+   "top1_clause": "INVOICE-01"
+  },
+  {
+   "query": "开发票需要什么",
+   "expected": "INVOICE-01",
+   "top1": 0.6481046425679192,
+   "top2": 0.497859374583206,
+   "top1_clause": "INVOICE-01"
+  },
+  {
+   "query": "发票开错了可以重开吗",
+   "expected": "INVOICE-01",
+   "top1": 0.7022756605387463,
+   "top2": 0.6143201967620602,
+   "top1_clause": "INVOICE-01"
+  },
+  {
+   "query": "发票抬头写错了怎么改",
+   "expected": "INVOICE-01",
+   "top1": 0.6088783852012163,
+   "top2": 0.5967129802380645,
+   "top1_clause": "INVOICE-01"
+  },
+  {
+   "query": "可以补开发票吗",
+   "expected": "INVOICE-01",
+   "top1": 0.6879951013556564,
+   "top2": 0.5653676928882357,
+   "top1_clause": "INVOICE-01"
+  },
+  {
+   "query": "退换货要提供什么资料",
+   "expected": "INVOICE-02",
+   "top1": 0.671722703505016,
+   "top2": 0.6057926616228585,
+   "top1_clause": "AFTERSALE-EXCHANGE-01"
+  },
+  {
+   "query": "申请售后需要什么凭证",
+   "expected": "INVOICE-02",
+   "top1": 0.7575737724734164,
+   "top2": 0.588801792926869,
+   "top1_clause": "INVOICE-02"
+  },
+  {
+   "query": "售后要提供购买截图吗",
+   "expected": "INVOICE-02",
+   "top1": 0.6515510655055493,
+   "top2": 0.5722933742542532,
+   "top1_clause": "INVOICE-02"
+  },
+  {
+   "query": "超时没发货有补偿吗",
+   "expected": "LOGISTICS-01",
+   "top1": 0.7372631563721433,
+   "top2": 0.7183904870120552,
+   "top1_clause": "LOGISTICS-01"
+  },
+  {
+   "query": "一直不发货能赔偿吗",
+   "expected": "LOGISTICS-01",
+   "top1": 0.700966306571311,
+   "top2": 0.6853566656699965,
+   "top1_clause": "LOGISTICS-01"
+  },
+  {
+   "query": "晚发货有没有赔付",
+   "expected": "LOGISTICS-01",
+   "top1": 0.7028615208100067,
+   "top2": 0.652257406835852,
+   "top1_clause": "LOGISTICS-01"
+  },
+  {
+   "query": "显示签收了但是我没收到",
+   "expected": "LOGISTICS-02",
+   "top1": 0.7454355860573515,
+   "top2": 0.5978585601821937,
+   "top1_clause": "LOGISTICS-02"
+  },
+  {
+   "query": "快递说签收了实际没到",
+   "expected": "LOGISTICS-02",
+   "top1": 0.7756259207245159,
+   "top2": 0.653903187942527,
+   "top1_clause": "LOGISTICS-02"
+  },
+  {
+   "query": "物流显示已签收但找不到件",
+   "expected": "LOGISTICS-02",
+   "top1": 0.8113325465439829,
+   "top2": 0.6582310725869204,
+   "top1_clause": "LOGISTICS-02"
+  },
+  {
+   "query": "快递运输中坏了怎么办",
+   "expected": "LOGISTICS-03",
+   "top1": 0.6301136925521175,
+   "top2": 0.6058263414572154,
+   "top1_clause": "LOGISTICS-03"
+  },
+  {
+   "query": "收到的时候是破损的",
+   "expected": "LOGISTICS-03",
+   "top1": 0.7154134586066205,
+   "top2": 0.5853463046972053,
+   "top1_clause": "LOGISTICS-03"
+  },
+  {
+   "query": "运输过程损坏谁负责",
+   "expected": "LOGISTICS-03",
+   "top1": 0.5774904426344948,
+   "top2": 0.5385012922002488,
+   "top1_clause": "LOGISTICS-03"
+  },
+  {
+   "query": "还没发货能改地址吗",
+   "expected": "ORDER-ADDRESS-01",
+   "top1": 0.7538536390311986,
+   "top2": 0.6490047955092866,
+   "top1_clause": "ORDER-ADDRESS-01"
+  },
+  {
+   "query": "下单后地址填错了能改吗",
+   "expected": "ORDER-ADDRESS-01",
+   "top1": 0.712435721524264,
+   "top2": 0.6257699277574981,
+   "top1_clause": "ORDER-ADDRESS-01"
+  },
+  {
+   "query": "收货地址可以修改吗",
+   "expected": "ORDER-ADDRESS-01",
+   "top1": 0.7932158172449131,
+   "top2": 0.6405680472032882,
+   "top1_clause": "ORDER-ADDRESS-01"
+  },
+  {
+   "query": "能换尺码吗",
+   "expected": "ORDER-ADDRESS-02",
+   "top1": 0.6658716171374087,
+   "top2": 0.622259687779703,
+   "top1_clause": "AFTERSALE-EXCHANGE-01"
+  },
+  {
+   "query": "可以改颜色吗",
+   "expected": "ORDER-ADDRESS-02",
+   "top1": 0.535699648100586,
+   "top2": 0.5186445347676518,
+   "top1_clause": "ORDER-ADDRESS-02"
+  },
+  {
+   "query": "订单商品规格能改吗",
+   "expected": "ORDER-ADDRESS-02",
+   "top1": 0.7194162728774798,
+   "top2": 0.6855650352392392,
+   "top1_clause": "ORDER-ADDRESS-02"
+  },
+  {
+   "query": "预售定金能退吗",
+   "expected": "PRESALE-01",
+   "top1": 0.791976213512583,
+   "top2": 0.666360624626195,
+   "top1_clause": "PRESALE-01"
+  },
+  {
+   "query": "预购的定金不给退吗",
+   "expected": "PRESALE-01",
+   "top1": 0.7808355297201147,
+   "top2": 0.6845447672133732,
+   "top1_clause": "PRESALE-01"
+  },
+  {
+   "query": "定金和尾款怎么算",
+   "expected": "PRESALE-01",
+   "top1": 0.722526287401633,
+   "top2": 0.5645737000336074,
+   "top1_clause": "PRESALE-01"
+  },
+  {
+   "query": "预售什么时候发货",
+   "expected": "PRESALE-02",
+   "top1": 0.7210080914209285,
+   "top2": 0.621744794450081,
+   "top1_clause": "PRESALE-02"
+  },
+  {
+   "query": "预售商品多久能到",
+   "expected": "PRESALE-02",
+   "top1": 0.7563710560139634,
+   "top2": 0.651332353189175,
+   "top1_clause": "PRESALE-02"
+  },
+  {
+   "query": "预售发货时间是什么时候",
+   "expected": "PRESALE-02",
+   "top1": 0.757236958567256,
+   "top2": 0.6559770186869842,
+   "top1_clause": "PRESALE-02"
+  },
+  {
+   "query": "买完就降价了能退差价吗",
+   "expected": "PRICE-PROTECT-01",
+   "top1": 0.7183707914099114,
+   "top2": 0.6628750223753131,
+   "top1_clause": "PRICE-PROTECT-01"
+  },
+  {
+   "query": "价保的规则是什么",
+   "expected": "PRICE-PROTECT-01",
+   "top1": 0.7344305022838573,
+   "top2": 0.6612468676332027,
+   "top1_clause": "PRICE-PROTECT-01"
+  },
+  {
+   "query": "降价了能补差价吗",
+   "expected": "PRICE-PROTECT-01",
+   "top1": 0.6979882926027583,
+   "top2": 0.6391603462901386,
+   "top1_clause": "PRICE-PROTECT-01"
+  },
+  {
+   "query": "价保申请有时间限制吗",
+   "expected": "PRICE-PROTECT-02",
+   "top1": 0.7967218989673012,
+   "top2": 0.6925296661890398,
+   "top1_clause": "PRICE-PROTECT-02"
+  },
+  {
+   "query": "价保多久内有效",
+   "expected": "PRICE-PROTECT-02",
+   "top1": 0.7492518733234088,
+   "top2": 0.7249984454909988,
+   "top1_clause": "PRICE-PROTECT-01"
+  },
+  {
+   "query": "价保过期了还能申请吗",
+   "expected": "PRICE-PROTECT-02",
+   "top1": 0.6911262385546147,
+   "top2": 0.6384504216538783,
+   "top1_clause": "PRICE-PROTECT-02"
+  },
+  {
+   "query": "跨境订单怎么退税",
+   "expected": "CROSSBORDER-01",
+   "top1": 0.7179923256995987,
+   "top2": 0.6418069656260187,
+   "top1_clause": "CROSSBORDER-02"
+  },
+  {
+   "query": "海购的商品能退吗",
+   "expected": "CROSSBORDER-01",
+   "top1": 0.6557383554760241,
+   "top2": 0.6133863118123549,
+   "top1_clause": "CROSSBORDER-01"
+  },
+  {
+   "query": "跨境订单售后怎么处理",
+   "expected": "CROSSBORDER-01",
+   "top1": 0.7051622194565622,
+   "top2": 0.6258627797016675,
+   "top1_clause": "CROSSBORDER-01"
+  },
+  {
+   "query": "跨境商品的税费谁承担",
+   "expected": "CROSSBORDER-02",
+   "top1": 0.6535120240490983,
+   "top2": 0.5029637059077745,
+   "top1_clause": "CROSSBORDER-02"
+  },
+  {
+   "query": "跨境退货运费包含关税吗",
+   "expected": "CROSSBORDER-02",
+   "top1": 0.741104362894242,
+   "top2": 0.6508133597752446,
+   "top1_clause": "CROSSBORDER-02"
+  },
+  {
+   "query": "企业采购售后服务一样吗",
+   "expected": "B2B-01",
+   "top1": 0.71149599506961,
+   "top2": 0.5738048398899354,
+   "top1_clause": "B2B-01"
+  },
+  {
+   "query": "公司团购有售后吗",
+   "expected": "B2B-01",
+   "top1": 0.6087212777930291,
+   "top2": 0.5623320668980065,
+   "top1_clause": "B2B-01"
+  },
+  {
+   "query": "企业账户的退货政策和普通的一样吗",
+   "expected": "B2B-01",
+   "top1": 0.6148438791575729,
+   "top2": 0.6107311748890872,
+   "top1_clause": "B2B-01"
+  },
+  {
+   "query": "以旧换新旧机怎么估价",
+   "expected": "TRADE-IN-01",
+   "top1": 0.7943619448862477,
+   "top2": 0.6307276331632984,
+   "top1_clause": "TRADE-IN-01"
+  },
+  {
+   "query": "旧手机抵多少钱怎么算",
+   "expected": "TRADE-IN-01",
+   "top1": 0.6493283674090864,
+   "top2": 0.6285116690565957,
+   "top1_clause": "TRADE-IN-01"
+  },
+  {
+   "query": "以旧换新估价标准",
+   "expected": "TRADE-IN-01",
+   "top1": 0.7147479378090907,
+   "top2": 0.5461056631049358,
+   "top1_clause": "TRADE-IN-01"
+  },
+  {
+   "query": "以旧换新换来的新机怎么保修",
+   "expected": "TRADE-IN-02",
+   "top1": 0.6705048634109275,
+   "top2": 0.6498046084016381,
+   "top1_clause": "TRADE-IN-02"
+  },
+  {
+   "query": "以旧换新的新机售后政策",
+   "expected": "TRADE-IN-02",
+   "top1": 0.7357024879141612,
+   "top2": 0.6900953806564961,
+   "top1_clause": "TRADE-IN-02"
+  }
+ ],
+ "negatives": [
+  {
+   "query": "你好",
+   "category": "off_topic",
+   "top1": 0.3772484758457555,
+   "top2": 0.37241175801409443,
+   "top1_clause": "AFTERSALE-EXCHANGE-01"
+  },
+  {
+   "query": "在吗",
+   "category": "off_topic",
+   "top1": 0.4120383201732417,
+   "top2": 0.3958024765450614,
+   "top1_clause": "REFUND-COMMON-04"
+  },
+  {
+   "query": "谢谢",
+   "category": "off_topic",
+   "top1": 0.44526662828371405,
+   "top2": 0.40138894919951057,
+   "top1_clause": "AFTERSALE-EXCHANGE-01"
+  },
+  {
+   "query": "你是谁开发的",
+   "category": "off_topic",
+   "top1": 0.3519142364593638,
+   "top2": 0.33275253000603655,
+   "top1_clause": "INVOICE-01"
+  },
+  {
+   "query": "你们公司老板是谁",
+   "category": "off_topic",
+   "top1": 0.3491999878435377,
+   "top2": 0.31719779188291536,
+   "top1_clause": "B2B-01"
+  },
+  {
+   "query": "今天天气怎么样",
+   "category": "off_topic",
+   "top1": 0.3607317715516049,
+   "top2": 0.35351560506246654,
+   "top1_clause": "B2B-01"
+  },
+  {
+   "query": "给我讲个笑话",
+   "category": "off_topic",
+   "top1": 0.3149849598876226,
+   "top2": 0.293287600361161,
+   "top1_clause": "RETURN-SEVENDAY-03"
+  },
+  {
+   "query": "帮我写首诗",
+   "category": "off_topic",
+   "top1": 0.2684110931794205,
+   "top2": 0.2573471533562341,
+   "top1_clause": "PRESALE-02"
+  },
+  {
+   "query": "你能做什么",
+   "category": "off_topic",
+   "top1": 0.3240200710755359,
+   "top2": 0.3147815173774962,
+   "top1_clause": "AFTERSALE-EXCHANGE-01"
+  },
+  {
+   "query": "客服是机器人吗",
+   "category": "off_topic",
+   "top1": 0.42576243813926906,
+   "top2": 0.4242614386633315,
+   "top1_clause": "INVOICE-02"
+  },
+  {
+   "query": "asdfghjkl",
+   "category": "off_topic",
+   "top1": 0.27986242375036496,
+   "top2": 0.26763007026478863,
+   "top1_clause": "AFTERSALE-EXCHANGE-01"
+  },
+  {
+   "query": "12345678",
+   "category": "off_topic",
+   "top1": 0.37520997796580724,
+   "top2": 0.3651047277548757,
+   "top1_clause": "AFTERSALE-EXCHANGE-01"
+  },
+  {
+   "query": "。。。",
+   "category": "off_topic",
+   "top1": 0.3742705158525243,
+   "top2": 0.3494871218866166,
+   "top1_clause": "REFUND-COMMON-02"
+  },
+  {
+   "query": "？？？",
+   "category": "off_topic",
+   "top1": 0.35969860430873685,
+   "top2": 0.3493452713490668,
+   "top1_clause": "REFUND-COMMON-03"
+  },
+  {
+   "query": "呵呵",
+   "category": "off_topic",
+   "top1": 0.42502782432758085,
+   "top2": 0.3660201918049731,
+   "top1_clause": "RETURN-GOOD-STANDARD-01"
+  },
+  {
+   "query": "我要退款",
+   "category": "action",
+   "top1": 0.6374006245545868,
+   "top2": 0.6353215750523211,
+   "top1_clause": "PRESALE-01"
+  },
+  {
+   "query": "帮我退货",
+   "category": "action",
+   "top1": 0.6642412877822084,
+   "top2": 0.6100085943036992,
+   "top1_clause": "REFUND-COMMON-04"
+  },
+  {
+   "query": "给我把钱退了",
+   "category": "action",
+   "top1": 0.6331274730548222,
+   "top2": 0.5747007516168237,
+   "top1_clause": "REFUND-COMMON-02"
+  },
+  {
+   "query": "我要投诉",
+   "category": "action",
+   "top1": 0.5004172289438645,
+   "top2": 0.49663643861418505,
+   "top1_clause": "RETURN-SEVENDAY-01"
+  },
+  {
+   "query": "我要找你们领导",
+   "category": "action",
+   "top1": 0.39035586916034887,
+   "top2": 0.34895271025273367,
+   "top1_clause": "LOGISTICS-02"
+  },
+  {
+   "query": "帮我改一下收货地址",
+   "category": "action",
+   "top1": 0.7626015755606156,
+   "top2": 0.6137162089637118,
+   "top1_clause": "ORDER-ADDRESS-01"
+  },
+  {
+   "query": "取消这个订单",
+   "category": "action",
+   "top1": 0.6291850788611498,
+   "top2": 0.59861107444394,
+   "top1_clause": "ORDER-ADDRESS-02"
+  },
+  {
+   "query": "我的订单号是ORD1003，帮我查下物流",
+   "category": "action",
+   "top1": 0.6474798105744345,
+   "top2": 0.5858008847536746,
+   "top1_clause": "LOGISTICS-02"
+  },
+  {
+   "query": "查一下我最近的订单",
+   "category": "action",
+   "top1": 0.5478520171259058,
+   "top2": 0.5406457870511401,
+   "top1_clause": "LOGISTICS-02"
+  },
+  {
+   "query": "我要转人工",
+   "category": "action",
+   "top1": 0.41713745373207856,
+   "top2": 0.4050695171392557,
+   "top1_clause": "AFTERSALE-EXCHANGE-01"
+  },
+  {
+   "query": "给我转客服",
+   "category": "action",
+   "top1": 0.6552413431654862,
+   "top2": 0.5534086766195362,
+   "top1_clause": "ORDER-ADDRESS-01"
+  },
+  {
+   "query": "我要炸了，马上给我处理",
+   "category": "action",
+   "top1": 0.46956228141054857,
+   "top2": 0.4622844118310291,
+   "top1_clause": "REFUND-COMMON-04"
+  },
+  {
+   "query": "再不退款我就曝光你们",
+   "category": "action",
+   "top1": 0.5757669242926375,
+   "top2": 0.5630776268716903,
+   "top1_clause": "REFUND-COMMON-04"
+  },
+  {
+   "query": "能不能开发票分期",
+   "category": "near_miss",
+   "top1": 0.6139560724221443,
+   "top2": 0.5459852759711187,
+   "top1_clause": "INVOICE-01"
+  },
+  {
+   "query": "会员等级有什么特别的售后权益",
+   "category": "near_miss",
+   "top1": 0.5250539220954488,
+   "top2": 0.5100650566511512,
+   "top1_clause": "INVOICE-02"
+  },
+  {
+   "query": "黑卡会员能优先处理吗",
+   "category": "near_miss",
+   "top1": 0.535201080363747,
+   "top2": 0.5128533538969111,
+   "top1_clause": "ORDER-ADDRESS-02"
+  },
+  {
+   "query": "积分可以抵现吗",
+   "category": "near_miss",
+   "top1": 0.5093236385927917,
+   "top2": 0.4895328909688508,
+   "top1_clause": "REFUND-COMMON-02"
+  },
+  {
+   "query": "优惠券过期了能补吗",
+   "category": "near_miss",
+   "top1": 0.5596059358529472,
+   "top2": 0.5465531580023811,
+   "top1_clause": "ORDER-ADDRESS-02"
+  },
+  {
+   "query": "满减怎么算的",
+   "category": "near_miss",
+   "top1": 0.5943305585661107,
+   "top2": 0.4405043458834209,
+   "top1_clause": "REFUND-COMMON-02"
+  },
+  {
+   "query": "买二送一是怎么送的",
+   "category": "near_miss",
+   "top1": 0.503361001132538,
+   "top2": 0.4981274475417912,
+   "top1_clause": "REFUND-COMMON-02"
+  },
+  {
+   "query": "能不能货到付款",
+   "category": "near_miss",
+   "top1": 0.6351657444859745,
+   "top2": 0.6210275870125959,
+   "top1_clause": "LOGISTICS-01"
+  },
+  {
+   "query": "支持花呗分期吗",
+   "category": "near_miss",
+   "top1": 0.5429108005446973,
+   "top2": 0.3685125607370914,
+   "top1_clause": "REFUND-COMMON-01"
+  },
+  {
+   "query": "有没有无息分期",
+   "category": "near_miss",
+   "top1": 0.5223914545610178,
+   "top2": 0.4746694936708515,
+   "top1_clause": "RETURN-SEVENDAY-02"
+  },
+  {
+   "query": "能刷信用卡吗",
+   "category": "near_miss",
+   "top1": 0.44241834341446423,
+   "top2": 0.42540541086577316,
+   "top1_clause": "INVOICE-01"
+  },
+  {
+   "query": "能寄到国外吗",
+   "category": "near_miss",
+   "top1": 0.5276959250114159,
+   "top2": 0.5230053610693786,
+   "top1_clause": "CROSSBORDER-01"
+  },
+  {
+   "query": "能不能代收货款",
+   "category": "near_miss",
+   "top1": 0.6087194367520181,
+   "top2": 0.5900025799299485,
+   "top1_clause": "LOGISTICS-02"
+  },
+  {
+   "query": "支持自提吗",
+   "category": "near_miss",
+   "top1": 0.46238608502996226,
+   "top2": 0.4434743789602938,
+   "top1_clause": "AFTERSALE-EXCHANGE-01"
+  },
+  {
+   "query": "门店可以退吗",
+   "category": "near_miss",
+   "top1": 0.6175350997479718,
+   "top2": 0.6075321889488194,
+   "top1_clause": "REFUND-COMMON-04"
+  },
+  {
+   "query": "能不能上门取件",
+   "category": "near_miss",
+   "top1": 0.5466715474310403,
+   "top2": 0.5335037185113419,
+   "top1_clause": "AFTERSALE-EXCHANGE-01"
+  },
+  {
+   "query": "退货能叫快递员上门吗",
+   "category": "near_miss",
+   "top1": 0.5976735808705236,
+   "top2": 0.5973095956144533,
+   "top1_clause": "LOGISTICS-02"
+  },
+  {
+   "query": "发票能开电子专票吗",
+   "category": "near_miss",
+   "top1": 0.7341683463616494,
+   "top2": 0.4939067436920593,
+   "top1_clause": "INVOICE-01"
+  },
+  {
+   "query": "可以开红字发票吗",
+   "category": "near_miss",
+   "top1": 0.6264697839220652,
+   "top2": 0.4875208131619277,
+   "top1_clause": "INVOICE-01"
+  },
+  {
+   "query": "买多了能拆单吗",
+   "category": "near_miss",
+   "top1": 0.5678473564297947,
+   "top2": 0.5568494385683183,
+   "top1_clause": "AFTERSALE-EXCHANGE-01"
+  },
+  {
+   "query": "能合并订单发货吗",
+   "category": "near_miss",
+   "top1": 0.658930571895099,
+   "top2": 0.6184060279979823,
+   "top1_clause": "ORDER-ADDRESS-01"
+  },
+  {
+   "query": "送我一张优惠券吧",
+   "category": "near_miss",
+   "top1": 0.5058426438120398,
+   "top2": 0.45685138963893995,
+   "top1_clause": "REFUND-COMMON-02"
+  },
+  {
+   "query": "给我打个折",
+   "category": "near_miss",
+   "top1": 0.4777213309451897,
+   "top2": 0.4557458559315905,
+   "top1_clause": "REFUND-COMMON-02"
+  },
+  {
+   "query": "有没有内部员工价",
+   "category": "near_miss",
+   "top1": 0.4474698980362353,
+   "top2": 0.42909626601773726,
+   "top1_clause": "PRICE-PROTECT-01"
+  },
+  {
+   "query": "样品能便宜点吗",
+   "category": "near_miss",
+   "top1": 0.5498274116495523,
+   "top2": 0.5357278241366618,
+   "top1_clause": "PRICE-PROTECT-01"
+  },
+  {
+   "query": "可以预留三天吗",
+   "category": "near_miss",
+   "top1": 0.5635889412946763,
+   "top2": 0.5537488637867557,
+   "top1_clause": "RETURN-SEVENDAY-01"
+  },
+  {
+   "query": "能帮我留一件吗",
+   "category": "near_miss",
+   "top1": 0.4762194562264229,
+   "top2": 0.4745779869830172,
+   "top1_clause": "AFTERSALE-EXCHANGE-01"
+  },
+  {
+   "query": "这个库存还有多少",
+   "category": "near_miss",
+   "top1": 0.424537076909592,
+   "top2": 0.4152762296976844,
+   "top1_clause": "AFTERSALE-EXCHANGE-01"
+  },
+  {
+   "query": "什么时候补货",
+   "category": "near_miss",
+   "top1": 0.6191381343551832,
+   "top2": 0.5944591989987246,
+   "top1_clause": "AFTERSALE-EXCHANGE-01"
+  },
+  {
+   "query": "上次你答错了，重新说一遍",
+   "category": "near_miss",
+   "top1": 0.47008673862775313,
+   "top2": 0.46261880260375227,
+   "top1_clause": "RETURN-GOOD-STANDARD-01"
+  }
+ ]
+}

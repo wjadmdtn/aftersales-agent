@@ -1,36 +1,25 @@
-"""T017: 降级路径。
+"""LLM 不可用时的降级。
 
-LLM 不可用时，只能用关键词判断"读写"，且用的是**比正常词表更宽**的写词表：
-宁可误拒一个只读请求，不可漏放一个写操作。
+**不猜。** 早先用关键词判断读写，结果是「退款多久能到账」被当成写操作拒掉，
+而「钱能回来吗」被放行——两个判断都不可靠。
 
-"未命中"不等于"确认是读操作"，只是"没有理由认为是写操作"。
-因此误判后果被限制为多/少一次只读查询，不会放大到资金操作。
+现在只有一条路：重试耗尽后统一话术 + 引导转人工。
+
+    为什么不区分只读/写：
+    区分本身就要求判断意图，而意图判断正是此刻不可用的能力。
+    用关键词替代它，等于在最不确定的时候做最要紧的决定。
+
+代价是只读请求也被挡。但这个状态只在 LLM 持续不可用时出现，
+且会立刻触发告警——短暂挡住比冒险执行写操作便宜得多。
 """
 from __future__ import annotations
 
-from app.config import settings
-
-READ = "read"
-WRITE_SUSPECTED = "write_suspected"
-
-
-def classify_degraded(
-    user_input: str, write_keywords: tuple[str, ...] | None = None
-) -> str:
-    kws = write_keywords if write_keywords is not None else settings.degrade_write_keywords
-    for kw in kws:
-        if kw in user_input:
-            return WRITE_SUSPECTED
-    return READ
-
-
-DEGRADED_WRITE_REPLY = (
-    "抱歉，系统暂时无法处理这类操作，请稍后重试。"
-    "如果问题较急，可以联系人工客服协助处理。"
+# 统一话术。不承诺处理时间，不推测用户诉求。
+DEGRADED_REPLY = (
+    "抱歉，系统暂时有点繁忙，没能帮您处理。"
+    "您可以稍后再试一次，如果着急的话，也可以转人工客服。"
 )
 
 
-def degraded_read_reply(has_order: bool) -> str:
-    if has_order:
-        return "抱歉，系统暂时无法完整理解您的问题，只能为您查询已绑定订单的信息。"
-    return "抱歉，系统暂时无法处理您的请求，请稍后重试或联系人工客服。"
+def degraded_reply() -> str:
+    return DEGRADED_REPLY
