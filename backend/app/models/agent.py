@@ -67,6 +67,9 @@ class IntentResult(BaseModel):
     source: IntentSource = IntentSource.LLM
     params: dict[str, Any] = Field(default_factory=dict)
     reason: str | None = None
+    # 意图识别顺带产出的检索改写：仅 policy 意图时有值，供政策检索用。
+    # 生成与 rerank 仍以用户原话为准；None = 不改写（行为与从前一致）。
+    search_query: str | None = None
 
 
 class OrderSnapshot(BaseModel):

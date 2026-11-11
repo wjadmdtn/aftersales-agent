@@ -30,12 +30,16 @@ class _SpyPolicy:
         self.calls = 0
         self.last_kwargs = {}
 
-    async def answer(self, *, question, order_created_at, product_type=None, trace_id=None):
+    async def answer(
+        self, *, question, order_created_at, product_type=None, trace_id=None,
+        search_query=None,
+    ):
         self.calls += 1
         self.last_kwargs = {
             "question": question,
             "order_created_at": order_created_at,
             "product_type": product_type,
+            "search_query": search_query,
         }
         from app.policy.models import PolicyAnswer
 
@@ -224,6 +228,44 @@ async def test_general_passes_order_created_at_and_product_type(make_loop):
     created = spy.last_kwargs["order_created_at"]
     assert created is not None
     assert created.date().isoformat() == "2026-10-26"
+
+
+# ---------- 查询改写（意图识别顺带产出，不加调用次数） ----------
+
+async def test_search_query_reaches_retrieval(make_loop):
+    """意图识别顺带产出的改写 query 必须传到检索层；
+    生成与 rerank 仍以用户原话为准（question 不变）。"""
+    spy = _SpyPolicy()
+    responses = {
+        "吊牌剪了还能退吗": IntentResult(
+            intent=Intent.POLICY,
+            confidence=0.8,
+            search_query="吊牌 商标标识 摘除 退货条件",
+        )
+    }
+    loop, _ = make_loop(spy, responses=responses)
+
+    await loop.handle(
+        session_id="s1", user_id="u1", message="吊牌剪了还能退吗", trace_id="t1", order_id="ORD1002"
+    )
+    assert spy.calls == 1
+    assert spy.last_kwargs["search_query"] == "吊牌 商标标识 摘除 退货条件"
+    assert spy.last_kwargs["question"] == "吊牌剪了还能退吗"
+
+
+async def test_missing_search_query_uses_raw_message(make_loop):
+    """模型没给改写（非 policy 意图/字段缺失）时用原文检索，不猜。"""
+    spy = _SpyPolicy()
+    responses = {
+        "退款多久到账": IntentResult(intent=Intent.POLICY, confidence=0.8)
+    }
+    loop, _ = make_loop(spy, responses=responses)
+
+    await loop.handle(
+        session_id="s1", user_id="u1", message="退款多久到账", trace_id="t1", order_id="ORD1002"
+    )
+    assert spy.last_kwargs["search_query"] is None
+    assert spy.last_kwargs["question"] == "退款多久到账"
 
 
 async def test_miss_falls_back_to_clarify(make_loop):

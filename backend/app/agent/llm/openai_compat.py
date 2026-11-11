@@ -43,6 +43,14 @@ def _format_clauses(retrieval: RetrievalResult) -> str:
         lines.append(block)
     return "\n\n".join(lines)
 
+def _parse_search_query(value) -> str | None:
+    """模型返回的改写查询清洗：非字符串/空白一律视为没改写，绝不抛错。"""
+    if not isinstance(value, str):
+        return None
+    cleaned = value.strip()
+    return cleaned or None
+
+
 _SYSTEM_PROMPT = """你是客服意图识别器。判断用户**真实诉求**，只输出 JSON。
 
 意图只能是：refund(发起退款) / logistics(查物流) / change_address(改地址) /
@@ -79,7 +87,13 @@ query_order(查订单) / complaint(投诉) / manual(要人工) / policy(政策�
 - 写操作（退款/改地址）判 execute 要格外谨慎，用户只是在问就判 inquiry
 - 陈述问题但未提诉求（"东西摔碎了"）不属于任何业务意图，intent 给 general
 
-输出格式：{"intent": "...", "mode": "...", "confidence": 0.0-1.0, "reason": "简短依据"}"""
+**search_query（查询改写）**：仅当 intent=policy 时输出。把用户的口语问题改写成
+适合检索政策条款的查询词：补全正式说法（如"吊牌剪了"→"吊牌 商标标识 摘除 退货条件"），
+保留具体细节和实体词，短语之间用空格分隔，不加标点不解释。
+不得添加用户没提的信息；问题本身已经规范时原样输出问题即可；
+intent 不是 policy 时给 null。改写与意图判定同一次完成，不单独调用模型。
+
+输出格式：{"intent": "...", "mode": "...", "confidence": 0.0-1.0, "reason": "简短依据", "search_query": "...|null"}"""
 
 
 class OpenAICompatLLMClient:
@@ -150,6 +164,7 @@ class OpenAICompatLLMClient:
             mode=mode,
             confidence=max(0.0, min(1.0, confidence)),
             reason=data.get("reason"),
+            search_query=_parse_search_query(data.get("search_query")),
         )
 
     async def rerank_policy(

@@ -214,7 +214,10 @@ class AgentLoop:
 
         if intent is Intent.POLICY:
             # 只有 policy 意图才走检索。业务动作不必查政策——既慢又答非所问。
-            policy_reply, retrieval = await self._try_policy(state, message, trace_id=trace_id)
+            # search_query：意图识别同一次调用顺带产出的改写查询，不额外花调用
+            policy_reply, retrieval = await self._try_policy(
+                state, message, trace_id=trace_id, search_query=result.search_query
+            )
             if policy_reply is not None:
                 return policy_reply
             # 检索不到：不猜、不编，交回澄清或转人工。
@@ -231,12 +234,18 @@ class AgentLoop:
         return await self._clarify(state, message, trace_id=trace_id)
 
     async def _try_policy(
-        self, state: SessionState, message: str, *, trace_id: str
+        self,
+        state: SessionState,
+        message: str,
+        *,
+        trace_id: str,
+        search_query: str | None = None,
     ) -> tuple[AgentReply | None, Any]:
         """检索命中则直接回答。
 
         返回 (回复, 检索结果)。回复为 None 表示未命中，交回澄清链路；
         检索结果供调用方取相似度信号（澄清耗尽转人工时判 BOUNDARY 用）。
+        search_query：意图识别顺带产出的改写查询，仅喂检索层。
         """
         if self.policy is None:
             return None, None
@@ -255,6 +264,7 @@ class AgentLoop:
             order_created_at=order_created_at,
             product_type=product_type,
             trace_id=trace_id,
+            search_query=search_query,
         )
 
         if answer.decision is RetrievalDecision.AMBIGUOUS:

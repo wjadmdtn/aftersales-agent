@@ -72,3 +72,26 @@ async def test_result_source_is_llm():
     classifier = IntentClassifier(stub, KEYWORDS)
     result, _ = await classifier.classify("随便")
     assert result.source is IntentSource.LLM
+
+
+# ---------- 查询改写字段解析 ----------
+
+def test_parse_search_query_strips():
+    from app.agent.llm.openai_compat import _parse_search_query
+
+    assert _parse_search_query(" 吊牌 商标标识 退货条件 ") == "吊牌 商标标识 退货条件"
+
+
+def test_parse_search_query_blank_is_none():
+    from app.agent.llm.openai_compat import _parse_search_query
+
+    assert _parse_search_query("   ") is None
+
+
+def test_parse_search_query_non_string_is_none():
+    """模型把该字段给成 null/数字/列表时一律视为没改写，不许抛错。"""
+    from app.agent.llm.openai_compat import _parse_search_query
+
+    assert _parse_search_query(None) is None
+    assert _parse_search_query(123) is None
+    assert _parse_search_query(["吊牌"]) is None

@@ -43,13 +43,16 @@ class PolicyService:
         order_created_at: datetime | None,
         product_type: str | None = None,
         trace_id: str | None = None,
+        search_query: str | None = None,
     ) -> tuple[PolicyAnswer, RetrievalResult | None]:
+        """search_query：意图识别顺带产出的改写查询，只喂给检索层；
+        rerank 与生成仍以 question（用户原话）为准——改写可能丢口语细节。"""
         if not self.enabled:
             return _miss("policy disabled"), None
 
         try:
             return await asyncio.wait_for(
-                self._answer(question, order_created_at, product_type),
+                self._answer(question, order_created_at, product_type, search_query),
                 timeout=self.timeout_ms / 1000,
             )
         except asyncio.TimeoutError:
@@ -60,13 +63,31 @@ class PolicyService:
             return _miss(f"error: {type(e).__name__}"), None
 
     async def _answer(
-        self, question: str, order_created_at: datetime | None, product_type: str | None
+        self,
+        question: str,
+        order_created_at: datetime | None,
+        product_type: str | None,
+        search_query: str | None = None,
     ) -> tuple[PolicyAnswer, RetrievalResult]:
         retrieval = self.retriever.retrieve(
-            query=question,
+            query=(search_query or "").strip() or question,
             order_created_at=order_created_at,
             product_type=product_type,
         )
+        # 改写检索 miss 且原话不同时，用原话再查一次（纯本地计算，不花 LLM 调用）。
+        # 改写是增强不是替换：它可能丢口语细节（实测改写后 0.633 检索层 miss，
+        # 原话 0.659 能进 rerank），miss 回退保住基线召回。
+        rewritten = (search_query or "").strip()
+        if (
+            retrieval.decision is RetrievalDecision.MISS
+            and rewritten
+            and rewritten != question
+        ):
+            retrieval = self.retriever.retrieve(
+                query=question,
+                order_created_at=order_created_at,
+                product_type=product_type,
+            )
         if retrieval.decision is RetrievalDecision.MISS:
             return _miss(retrieval.reason), retrieval
 

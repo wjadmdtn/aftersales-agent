@@ -43,7 +43,7 @@ def fake_redis_for_prod(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def _force_stub_embedder(monkeypatch):
+def force_stub_embedder(monkeypatch):
     """测试绝不加载真实 embedding 模型（宪法：CI 不依赖真模型）。
 
     本地 .env 可能配了 MOCK_RAG_EMBEDDER=bge；凡是走 create_app() 装配的
@@ -178,7 +178,7 @@ async def in_thread(fn, *args, **kwargs):
 
 
 @pytest.fixture(autouse=True)
-def _reset_chat_state():
+def reset_chat_state():
     reset_chat()
     yield
     reset_chat()
