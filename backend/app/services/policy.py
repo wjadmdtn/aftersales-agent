@@ -26,11 +26,15 @@ class PolicyService:
         llm: PolicyLLM,
         timeout_ms: int,
         enabled: bool = True,
+        reranker=None,
     ):
         self.retriever = retriever
         self.answerer = PolicyAnswerer(llm)
         self.timeout_ms = timeout_ms
         self.enabled = enabled
+        # 两步：检索算出"像不像"，rerank 判断"能不能回答"。
+        # 不开时传 None，行为与 005 一致。
+        self.reranker = reranker
 
     async def answer(
         self,
@@ -66,6 +70,11 @@ class PolicyService:
         if retrieval.decision is RetrievalDecision.MISS:
             return _miss(retrieval.reason), retrieval
 
+        if self.reranker is not None:
+            retrieval = await self.reranker.apply(query=question, retrieval=retrieval)
+            if retrieval.decision is RetrievalDecision.MISS:
+                return _miss(retrieval.reason), retrieval
+
         answer = await self.answerer.answer(user_input=question, retrieval=retrieval)
         return answer, retrieval
 
@@ -78,6 +87,7 @@ def build_policy_service(llm: PolicyLLM, cfg=None) -> PolicyService:
     """按配置装配：无 PG 时用内存存储（CI / 本地无库），有 PG 时走 pgvector。"""
     from app.config import settings as _settings
     from app.policy.embedder import build_embedder
+    from app.policy.keyword import KeywordIndex
     from app.policy.seed import load_policies
     from app.policy.store import ClauseStore, InMemoryClauseStore, PgClauseStore
 
@@ -102,10 +112,29 @@ def build_policy_service(llm: PolicyLLM, cfg=None) -> PolicyService:
         similarity_threshold=cfg.rag_similarity_threshold,
         ambiguity_margin=cfg.rag_ambiguity_margin,
         top_k=cfg.rag_recall_top_k,
+        # 关键词召回：例外条款（如「吊牌被摘剪」）只写在这，embedding 刻意排除了它
+        keyword_index=(
+            KeywordIndex(clauses) if getattr(cfg, "rag_keyword_enabled", False) else None
+        ),
     )
+    reranker = None
+    if getattr(cfg, "rag_rerank_enabled", False):
+        from app.policy.rerank import LLMReranker
+
+        # rerank 需要模型具备 rerank_policy 能力；桩模型不实现，直接跳过
+        if hasattr(llm, "rerank_policy"):
+            reranker = LLMReranker(
+                llm,
+                keep_threshold=cfg.rag_rerank_keep_threshold,
+                top_n=cfg.rag_rerank_top_n,
+            )
+        else:
+            logger.info("llm has no rerank_policy, rerank disabled")
+
     return PolicyService(
         retriever=retriever,
         llm=llm,
         timeout_ms=cfg.rag_timeout_ms,
         enabled=cfg.policy_enabled,
+        reranker=reranker,
     )

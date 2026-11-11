@@ -569,6 +569,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument("--seed", default=str(DEFAULT_SEED))
     ap.add_argument("--top-k", type=int, default=5)
+    ap.add_argument(
+        "--keyword",
+        action="store_true",
+        help="开启关键词召回 + RRF 融合（对比纯向量与混合检索的差异）",
+    )
     ap.add_argument("--fpr-budget", type=float, default=0.05)
     ap.add_argument("--amb-budget", type=float, default=0.15)
     ap.add_argument(
@@ -604,12 +609,19 @@ def main(argv: list[str] | None = None) -> int:
 
     clauses = load_policies(args.seed)
     store = InMemoryClauseStore(clauses, embedder)
+    kw_index = None
+    if args.keyword:
+        from app.policy.keyword import KeywordIndex  # noqa: E402
+
+        kw_index = KeywordIndex(clauses)
+        print("关键词召回：开启")
     retriever = Retriever(
         store=store,
         embedder=embedder,
         similarity_threshold=0.0,
         ambiguity_margin=0.0,
         top_k=args.top_k,
+        keyword_index=kw_index,
     )
 
     print(f"加载 {len(clauses)} 条条款；正样本 {len(POSITIVES)} / 负样本 {len(NEGATIVES)}")

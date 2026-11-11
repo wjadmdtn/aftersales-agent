@@ -63,7 +63,15 @@ class Settings(BaseSettings):
     policy_seed_path: str = "seed/policies/policies.json"
     policy_enabled: bool = True
     rag_recall_top_k: int = Field(default=5, ge=1)
+    # 关键词召回：2~4 字 n-gram + RRF 融合，救向量漏召的实体词/例外条款。
+    # 关掉即退回 005 纯向量行为。阈值判断始终只看向量余弦，融合只影响候选集。
+    rag_keyword_enabled: bool = True
     rag_rerank_top_n: int = Field(default=2, ge=1)
+    # rerank：检索后用模型复核条款能否真正回答问题。
+    # 关掉即退回 005 的纯向量行为；开启会每题多一次 LLM 调用。
+    rag_rerank_enabled: bool = True
+    # 低于此分判为"不能回答"，剔除该条款。太高会漏答，太低会答非所问。
+    rag_rerank_keep_threshold: float = Field(default=0.5, ge=0, le=1)
     rag_ambiguity_margin: float = Field(default=0.0, ge=0, le=1)
     # 政策问答要跑检索 + LLM 生成两段，800ms 必然超时。
     # 这个超时只保护政策链路，不阻塞主对话——超时即降级为 miss。

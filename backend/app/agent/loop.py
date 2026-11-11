@@ -214,11 +214,17 @@ class AgentLoop:
 
         if intent is Intent.POLICY:
             # 只有 policy 意图才走检索。业务动作不必查政策——既慢又答非所问。
-            policy_reply = await self._try_policy(state, message, trace_id=trace_id)
+            policy_reply, retrieval = await self._try_policy(state, message, trace_id=trace_id)
             if policy_reply is not None:
                 return policy_reply
-            # 检索不到：不猜、不编，交回澄清或转人工
-            return await self._clarify(state, message, trace_id=trace_id)
+            # 检索不到：不猜、不编，交回澄清或转人工。
+            # 相似度信号随澄清传递：2 轮耗尽转人工时，check_boundary 用它判 BOUNDARY。
+            return await self._clarify(
+                state,
+                message,
+                trace_id=trace_id,
+                rag_top_similarity=retrieval.top_similarity if retrieval else None,
+            )
 
         # 无法识别可调用的工具：澄清优先，转人工是最后手段。
         # "AI 一时没理解"不等于"用户需要人工"——直接转会把人工成本吃光。
@@ -226,10 +232,14 @@ class AgentLoop:
 
     async def _try_policy(
         self, state: SessionState, message: str, *, trace_id: str
-    ) -> AgentReply | None:
-        """检索命中则直接回答；未命中返回 None，交回澄清链路。"""
+    ) -> tuple[AgentReply | None, Any]:
+        """检索命中则直接回答。
+
+        返回 (回复, 检索结果)。回复为 None 表示未命中，交回澄清链路；
+        检索结果供调用方取相似度信号（澄清耗尽转人工时判 BOUNDARY 用）。
+        """
         if self.policy is None:
-            return None
+            return None, None
 
         order_created_at = None
         product_type = None
@@ -240,7 +250,7 @@ class AgentLoop:
                 order_created_at = _parse_dt(order.get("created_at"))
                 product_type = order.get("product_type")
 
-        answer, _retrieval = await self.policy.answer(
+        answer, retrieval = await self.policy.answer(
             question=message,
             order_created_at=order_created_at,
             product_type=product_type,
@@ -249,35 +259,69 @@ class AgentLoop:
 
         if answer.decision is RetrievalDecision.AMBIGUOUS:
             state.clarify_round += 1
-            return AgentReply(
-                reply=answer.ambiguity_question or "您能再具体说一下是想问哪方面吗？",
-                intent=None,
-                state="clarifying",
+            return (
+                AgentReply(
+                    reply=answer.ambiguity_question or "您能再具体说一下是想问哪方面吗？",
+                    intent=None,
+                    state="clarifying",
+                ),
+                retrieval,
             )
 
         if answer.decision is RetrievalDecision.MISS or not answer.answer:
-            return None
+            # rerank 全剔除 = 模型确认知识库里没有能回答的条款（知识缺口）。
+            # 换个表述也不会有答案，追问无意义——直接按能力边界转人工，
+            # 不走 2 轮追问。检索层 miss（分数不够没进 rerank）仍交回澄清。
+            if retrieval is not None and retrieval.rerank_rejected:
+                from app.models.handoff import TriggerResult, TriggerType
+
+                return (
+                    await self._handoff(
+                        state,
+                        message,
+                        primary_intent="policy",
+                        trace_id=trace_id,
+                        forced_trigger=TriggerResult.fire(
+                            TriggerType.BOUNDARY, retrieval.reason
+                        ),
+                        reply_intent=Intent.POLICY,
+                    ),
+                    retrieval,
+                )
+            return None, retrieval
 
         state.last_cited_clause_ids = list(answer.cited_clause_ids)
         state.policy_turns += 1
-        return AgentReply(
-            reply=answer.answer,
-            intent=Intent.POLICY,
-            tool_calls=["policy.search"],
-            state="policy_answered",
+        return (
+            AgentReply(
+                reply=answer.answer,
+                intent=Intent.POLICY,
+                tool_calls=["policy.search"],
+                state="policy_answered",
+            ),
+            retrieval,
         )
 
     CLARIFY_ROUND_LIMIT = 2
 
     async def _clarify(
-        self, state: SessionState, message: str, *, trace_id: str
+        self,
+        state: SessionState,
+        message: str,
+        *,
+        trace_id: str,
+        rag_top_similarity: float | None = None,
     ) -> AgentReply:
         state.clarify_round += 1
 
         if state.clarify_round > self.CLARIFY_ROUND_LIMIT:
             state.clarify_round = 0
             return await self._handoff(
-                state, message, primary_intent="general", trace_id=trace_id
+                state,
+                message,
+                primary_intent="general",
+                trace_id=trace_id,
+                rag_top_similarity=rag_top_similarity,
             )
 
         from app.agent.clarify import clarify_round_one, clarify_round_two
@@ -293,12 +337,27 @@ class AgentLoop:
         return AgentReply(reply=reply, intent=None, state="clarifying")
 
     async def _handoff(
-        self, state: SessionState, message: str, *, primary_intent: str, trace_id: str
+        self,
+        state: SessionState,
+        message: str,
+        *,
+        primary_intent: str,
+        trace_id: str,
+        forced_trigger=None,
+        reply_intent: Intent | None = None,
+        rag_top_similarity: float | None = None,
     ) -> AgentReply:
         if self.coordinator is None:
-            return AgentReply(reply="正在为您接入人工客服，请稍候。", state="handoff_pending")
+            return AgentReply(
+                reply="正在为您接入人工客服，请稍候。", intent=reply_intent, state="handoff_pending"
+            )
 
-        trigger = self.coordinator.detect(user_message=message)
+        if forced_trigger is not None:
+            trigger = forced_trigger
+        else:
+            trigger = self.coordinator.detect(
+                user_message=message, rag_top_similarity=rag_top_similarity
+            )
         if not trigger.triggered:
             # 意图是 manual/complaint 但关键词没命中时，仍按该意图转接
             from app.models.handoff import TriggerResult, TriggerType
@@ -321,9 +380,11 @@ class AgentLoop:
         # 默认 no-op，避免 003~005 的既有测试被牵连。
         if self.on_handoff is not None:
             await self.on_handoff(state.session_id, outcome.state)
+        if reply_intent is None:
+            reply_intent = Intent.MANUAL if primary_intent == "manual" else Intent.COMPLAINT
         return AgentReply(
             reply=outcome.reply,
-            intent=Intent.MANUAL if primary_intent == "manual" else Intent.COMPLAINT,
+            intent=reply_intent,
             state="handoff_queued",
         )
 

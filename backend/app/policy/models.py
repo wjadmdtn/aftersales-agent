@@ -45,6 +45,11 @@ class PolicyClause(BaseModel):
 class RetrievedClause(BaseModel):
     clause: PolicyClause
     similarity: float
+    # 融合召回：similarity 保持为向量余弦（阈值判断用），fusion_score 仅用于排序。
+    # 只被关键词召回时 vector_similarity 为 None——不能拿 RRF 分冒充余弦分。
+    vector_similarity: float | None = None
+    fusion_score: float = 0.0
+    source: str = "vector"
 
 
 class RetrievalResult(BaseModel):
@@ -55,6 +60,10 @@ class RetrievalResult(BaseModel):
     decision: RetrievalDecision = RetrievalDecision.MISS
     reason: str = ""
     used_default_date: bool = False
+    # rerank 全剔除时置 True：这是「模型确认库里没有能回答的条款」（知识缺口），
+    # 与「检索层分数不够」（可能只是表述问题）是两种不同的 miss。
+    # 主循环只对前者直接转人工，后者仍走澄清。
+    rerank_rejected: bool = False
 
     @property
     def top_similarity(self) -> float | None:

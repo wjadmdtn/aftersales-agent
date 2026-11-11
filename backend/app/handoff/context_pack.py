@@ -28,6 +28,7 @@ _INTENT_LABEL = {
     "query_order": "查询订单",
     "complaint": "投诉",
     "manual": "要求人工",
+    "policy": "政策咨询",
     "general": "未识别诉求",
 }
 

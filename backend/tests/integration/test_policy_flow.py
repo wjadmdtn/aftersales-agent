@@ -77,6 +77,70 @@ class _MissPolicy:
         return PolicyAnswer(decision=RetrievalDecision.MISS), None
 
 
+class _RerankRejectedPolicy:
+    """rerank 全剔除后的 miss：检索层进过 rerank，但模型判定没有条款能回答。
+    这是「知识缺口」，与「检索层分数不够」是两种不同的 miss。"""
+
+    def __init__(self):
+        self.calls = 0
+
+    async def answer(self, **kw):
+        from datetime import date
+
+        from app.policy.models import PolicyAnswer, RetrievalResult
+
+        self.calls += 1
+        return (
+            PolicyAnswer(decision=RetrievalDecision.MISS, rejection="rerank 判为不相关"),
+            RetrievalResult(
+                query=kw["question"],
+                order_date=date(2026, 11, 10),
+                candidates=[],
+                decision=RetrievalDecision.MISS,
+                reason="rerank 判为不相关（阈值 0.5）：['RETURN-SEVENDAY-01']",
+                rerank_rejected=True,
+            ),
+        )
+
+
+class _LowScoreMissPolicy:
+    """检索层就没过阈值：没进 rerank，可能只是表述问题，不算知识缺口。"""
+
+    def __init__(self):
+        self.calls = 0
+
+    async def answer(self, **kw):
+        from datetime import date
+
+        from app.policy.models import (
+            PolicyAnswer,
+            PolicyClause,
+            RetrievalResult,
+            RetrievedClause,
+        )
+
+        self.calls += 1
+        clause = PolicyClause(
+            clause_id="RETURN-SEVENDAY-01",
+            policy_id="return",
+            version=1,
+            effective_from=date(2020, 1, 1),
+            category="return",
+            title="七天无理由退货",
+            body="签收后7天内可无理由退货。",
+        )
+        return (
+            PolicyAnswer(decision=RetrievalDecision.MISS),
+            RetrievalResult(
+                query=kw["question"],
+                order_date=date(2026, 11, 10),
+                candidates=[RetrievedClause(clause=clause, similarity=0.51)],
+                decision=RetrievalDecision.MISS,
+                reason="top1 0.51 < threshold 0.64",
+            ),
+        )
+
+
 @pytest.fixture
 async def make_loop():
     import fakeredis.aioredis
@@ -91,11 +155,21 @@ async def make_loop():
     sessions = SessionStore(redis, ttl_seconds=3600)
     tools = InProcessMockClient(mock_app)
 
-    def _build(policy=None, *, responses=None, fail_mode=None):
+    def _build(policy=None, *, responses=None, fail_mode=None, with_coordinator=False):
         stub = StubLLMClient(responses or {}, fail_mode=fail_mode)
         classifier = IntentClassifier(stub, keyword_map={})
+        coordinator = None
+        if with_coordinator:
+            from app.handoff.coordinator import HandoffCoordinator
+            from app.handoff.queue import HandoffQueue
+
+            coordinator = HandoffCoordinator(HandoffQueue(redis))
         loop = AgentLoop(
-            classifier=classifier, sessions=sessions, tools=tools, policy=policy
+            classifier=classifier,
+            sessions=sessions,
+            tools=tools,
+            policy=policy,
+            coordinator=coordinator,
         )
         return loop, stub
 
@@ -174,6 +248,90 @@ async def test_ambiguous_asks_instead_of_answering(make_loop):
     )
     assert reply.state == "clarifying"
     assert "退" in reply.reply
+
+
+# ---------- rerank 判定不相关 → 直接转人工（不走追问） ----------
+
+RERANK_MSG = "吊牌被剪了还能退吗"
+
+
+async def test_rerank_rejected_goes_straight_to_handoff(make_loop):
+    """rerank 判定没有条款能回答 = 知识缺口。换个说法问也不会有答案，
+    追问无意义，直接转人工——不得先走 2 轮澄清。"""
+    policy = _RerankRejectedPolicy()
+    loop, _ = make_loop(policy, responses={
+        RERANK_MSG: IntentResult(intent=Intent.POLICY, confidence=0.8)
+    })
+
+    reply = await loop.handle(
+        session_id="s-b1", user_id="u1", message=RERANK_MSG, trace_id="t1", order_id="ORD1002"
+    )
+    assert policy.calls == 1
+    assert reply.state == "handoff_pending"
+    assert reply.intent is Intent.POLICY
+
+
+async def test_rerank_rejected_handoff_carries_boundary_trigger(make_loop):
+    """转接单必须标 BOUNDARY，人工端看到的是真实原因（rerank 判定不相关），
+    而不是兜底的「用户主动要求」。"""
+    from app.models.handoff import TriggerType
+
+    from app.config import settings
+
+    policy = _RerankRejectedPolicy()
+    loop, _ = make_loop(policy, responses={
+        RERANK_MSG: IntentResult(intent=Intent.POLICY, confidence=0.8)
+    }, with_coordinator=True)
+
+    reply = await loop.handle(
+        session_id="s-b2", user_id="u1", message=RERANK_MSG, trace_id="t1", order_id="ORD1002"
+    )
+    assert reply.state == "handoff_queued"
+    assert reply.reply == settings.handoff_scripts["boundary"]
+
+    ctx = await loop.coordinator.queue.get_pack("s-b2")
+    assert ctx is not None
+    assert ctx.trigger_type is TriggerType.BOUNDARY
+    assert "rerank" in ctx.trigger_detail
+
+
+async def test_low_score_miss_still_clarifies(make_loop):
+    """检索层分数不够（没进 rerank）≠ 知识缺口：可能只是表述问题，
+    仍走澄清，不直接转人工。"""
+    policy = _LowScoreMissPolicy()
+    loop, _ = make_loop(policy, responses={
+        RERANK_MSG: IntentResult(intent=Intent.POLICY, confidence=0.8)
+    })
+
+    reply = await loop.handle(
+        session_id="s-b3", user_id="u1", message=RERANK_MSG, trace_id="t1", order_id="ORD1002"
+    )
+    assert policy.calls == 1
+    assert reply.state == "clarifying"
+
+
+async def test_low_score_miss_handoff_after_clarify_limit_uses_boundary(make_loop):
+    """澄清 2 轮耗尽后转人工时，本轮检索分数低 → 触发 BOUNDARY，
+    而不是兜底的 USER_REQUEST 话术。"""
+    from app.models.handoff import TriggerType
+
+    from app.config import settings
+
+    policy = _LowScoreMissPolicy()
+    msgs = [RERANK_MSG, "就是吊牌的事", "你们到底怎么处理"]
+    loop, _ = make_loop(policy, responses={
+        m: IntentResult(intent=Intent.POLICY, confidence=0.8) for m in msgs
+    }, with_coordinator=True)
+
+    for i, m in enumerate(msgs):
+        reply = await loop.handle(
+            session_id="s-b4", user_id="u1", message=m, trace_id=f"t{i}", order_id="ORD1002"
+        )
+
+    assert reply.state == "handoff_queued"
+    assert reply.reply == settings.handoff_scripts["boundary"]
+    ctx = await loop.coordinator.queue.get_pack("s-b4")
+    assert ctx.trigger_type is TriggerType.BOUNDARY
 
 
 async def test_degraded_never_retrieves(make_loop):

@@ -27,6 +27,14 @@ class ClauseStore(Protocol):
         limit: int,
     ) -> list[RetrievedClause]: ...
 
+    def visible_ids(
+        self,
+        *,
+        categories: list[str] | None,
+        product_type: str | None,
+        order_date: date,
+    ) -> set[str]: ...
+
 
 def _visible(clause: PolicyClause, *, product_type: str | None, order_date: date) -> bool:
     if not clause.effective_at(order_date):
@@ -64,6 +72,22 @@ class InMemoryClauseStore:
             scored.append(RetrievedClause(clause=clause, similarity=cosine(query_vector, vec)))
         scored.sort(key=lambda r: r.similarity, reverse=True)
         return scored[:limit]
+
+    def visible_ids(
+        self,
+        *,
+        categories: list[str] | None,
+        product_type: str | None,
+        order_date: date,
+    ) -> set[str]:
+        out: set[str] = set()
+        for clause in self.clauses:
+            if categories and clause.category not in categories:
+                continue
+            if not _visible(clause, product_type=product_type, order_date=order_date):
+                continue
+            out.add(clause.clause_id)
+        return out
 
 
 class PgClauseStore:
@@ -194,6 +218,27 @@ class PgClauseStore:
             )
             out.append(RetrievedClause(clause=clause, similarity=float(r[10])))
         return out
+
+    def visible_ids(
+        self,
+        *,
+        categories: list[str] | None,
+        product_type: str | None,
+        order_date: date,
+    ) -> set[str]:
+        sql = """
+        SELECT clause_id FROM policy_clause
+        WHERE (%(categories)s::text[] IS NULL OR category = ANY(%(categories)s::text[]))
+          AND effective_from <= %(d)s
+          AND (effective_to IS NULL OR effective_to >= %(d)s)
+          AND (product_types && ARRAY['*']::text[]
+               OR (%(pt)s::text IS NOT NULL AND product_types && ARRAY[%(pt)s]::text[]))
+        """
+        params = {"categories": categories, "pt": product_type, "d": order_date}
+        with self._conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+                return {row[0] for row in cur.fetchall()}
 
 
 def json_dumps(obj) -> str:

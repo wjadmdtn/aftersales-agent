@@ -47,31 +47,18 @@ def _build_llm():
 
 
 def _build_policy(redis):
-    """政策问答装配。任何环节不可用都不阻塞启动——它只是附加能力。"""
+    """政策问答装配。任何环节不可用都不阻塞启动——它只是附加能力。
+
+    委托给 build_policy_service：检索（向量 + 关键词召回）、rerank 的装配
+    只在那一处维护，避免两条装配路径逐渐分叉（此前 rerank/keyword 只在
+    脚本和测试里生效，主服务从未接上）。
+    """
     if not settings.policy_enabled:
         return None
     try:
-        from app.policy.embedder import build_embedder
-        from app.policy.retriever import Retriever
-        from app.policy.seed import load_policies
-        from app.policy.store import InMemoryClauseStore
-        from app.services.policy import PolicyService
+        from app.services.policy import build_policy_service
 
-        embedder = build_embedder(settings.rag_embedder, settings.rag_embedding_dim)
-        store = InMemoryClauseStore(load_policies(settings.policy_seed_path), embedder)
-        retriever = Retriever(
-            store=store,
-            embedder=embedder,
-            similarity_threshold=settings.rag_similarity_threshold,
-            ambiguity_margin=settings.rag_ambiguity_margin,
-            top_k=settings.rag_recall_top_k,
-        )
-        return PolicyService(
-            retriever=retriever,
-            llm=_policy_llm(),
-            timeout_ms=settings.rag_timeout_ms,
-            enabled=True,
-        )
+        return build_policy_service(_policy_llm())
     except Exception:
         logger.warning("policy module unavailable, continuing without it", exc_info=True)
         return None

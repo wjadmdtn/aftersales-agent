@@ -152,6 +152,68 @@ class OpenAICompatLLMClient:
             reason=data.get("reason"),
         )
 
+    async def rerank_policy(
+        self, *, query: str, clauses: list
+    ) -> dict[str, float]:
+        """逐条判断条款能否回答该问题，输出 0~1 相关性分。
+
+        与 answer_policy 的区别：这里只判相关性，不生成答案。
+        之所以要一次判完全部候选，是为了让模型在**同一批**里做相对比较，
+        分多次调用会让模型对每条都给出偏高的分。
+        """
+        if not clauses:
+            return {}
+
+        block = "\n\n".join(
+            f"[{c.clause_id}] {c.title}\n{c.body[:200]}" for c in clauses
+        )
+        prompt = f"""判断下面每条政策条款能否真正回答用户的问题。
+
+用户问题：{query}
+
+【候选条款】
+{block}
+
+规则：
+- 只填分数，不要解释
+- 1.0 = 这条条款直接回答了问题
+- 0.5 = 部分相关但没正面回答
+- 0.0 = 讲的是另一件事（哪怕用词相近，如"修改地址"不能回答"合并发货"）
+- 话题相近但核心问题不同的，给 0.2 以下
+
+只输出 JSON：{{"clause_id": 分数, ...}}"""
+
+        payload = {
+            "model": self.model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0,
+            "response_format": {"type": "json_object"},
+        }
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout_ms / 1000) as client:
+                resp = await client.post(
+                    f"{self.base_url}/chat/completions",
+                    json=payload,
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                )
+                resp.raise_for_status()
+                content = resp.json()["choices"][0]["message"]["content"]
+        except (httpx.HTTPError, KeyError, IndexError) as e:
+            raise LLMError(f"llm rerank call failed: {e}") from e
+
+        try:
+            data = json.loads(content)
+        except json.JSONDecodeError as e:
+            raise LLMError(f"llm rerank returned invalid json: {e}") from e
+
+        out: dict[str, float] = {}
+        for cid, v in (data or {}).items():
+            try:
+                out[str(cid)] = max(0.0, min(1.0, float(v)))
+            except (TypeError, ValueError):
+                continue
+        return out
+
     async def answer_policy(
         self, *, user_input: str, retrieval: RetrievalResult
     ) -> PolicyAnswer:

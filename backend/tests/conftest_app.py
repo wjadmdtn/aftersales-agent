@@ -42,6 +42,18 @@ def fake_redis_for_prod(monkeypatch):
     return created
 
 
+@pytest.fixture(autouse=True)
+def _force_stub_embedder(monkeypatch):
+    """测试绝不加载真实 embedding 模型（宪法：CI 不依赖真模型）。
+
+    本地 .env 可能配了 MOCK_RAG_EMBEDDER=bge；凡是走 create_app() 装配的
+    测试（包括没经过 prod_app 的用例）都强制回 stub，装配逻辑原样执行。
+    """
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "rag_embedder", "stub", raising=False)
+
+
 @pytest.fixture
 def prod_app(monkeypatch, fake_redis_for_prod):
     """重置 mock store 并返回未启动的 app。

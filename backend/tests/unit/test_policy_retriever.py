@@ -165,6 +165,65 @@ def test_threshold_boundary_is_inclusive():
     assert _run([0.6, 0.4], 0.6, 0.05).decision is RetrievalDecision.HIT
 
 
+class _KwBoostIndex:
+    """把指定条款强行顶到关键词召回首位，制造融合重排。"""
+
+    def __init__(self, clause):
+        self.clause = clause
+
+    def search(self, query, *, limit, candidates=None):
+        return [
+            RetrievedClause(
+                clause=self.clause, similarity=1.0, vector_similarity=None, source="keyword"
+            )
+        ]
+
+
+class _TwoClauseStore:
+    """低分条款 + 高分条款的固定 store，clause_id 与关键词召回共用。"""
+
+    def __init__(self, low, high):
+        self.low, self.high = low, high
+
+    def search(self, **kw):
+        return [
+            RetrievedClause(clause=self.low, similarity=0.615),
+            RetrievedClause(clause=self.high, similarity=0.659),
+        ]
+
+    def visible_ids(self, **kw):
+        return {self.low.clause_id, self.high.clause_id}
+
+
+def test_fused_order_does_not_hide_high_vector_candidate():
+    """置信判定必须看候选集里的**向量最高分**，不是融合排序的第一位。
+
+    真实案例：「能合并订单发货吗」召回「修改收货地址」vec 0.659（过阈值），
+    但关键词融合把 vec 0.615 的条款顶到第一位，早退检查直接判 miss——
+    本该进 rerank、被拒答转人工的知识缺口案例被吞成了检索层 miss。
+    """
+    low = PolicyClause(
+        clause_id="C-LOW", policy_id="P", version=1,
+        effective_from=date(2026, 1, 1), category="refund", title="t", body="b",
+    )
+    high = PolicyClause(
+        clause_id="C-HIGH", policy_id="P", version=1,
+        effective_from=date(2026, 1, 1), category="refund", title="t2", body="b2",
+    )
+    r = Retriever(
+        store=_TwoClauseStore(low, high),
+        embedder=StubEmbedder(64),
+        similarity_threshold=0.64,
+        ambiguity_margin=0.0,
+        top_k=5,
+        keyword_index=_KwBoostIndex(low),
+    )
+    res = r.retrieve(query="能合并订单发货吗", order_created_at=datetime(2026, 11, 6, tzinfo=timezone.utc))
+    assert res.decision is RetrievalDecision.HIT, res.reason
+    # 可信度最高的排第一，交给 rerank 复核
+    assert res.candidates[0].clause.clause_id == "C-HIGH"
+
+
 # ---------- 日期回落 ----------
 
 def test_missing_order_date_defaults_to_today():
