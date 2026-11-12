@@ -1,0 +1,18 @@
+# 构建上下文是仓库根，这里排除不需要进镜像的东西。
+# 注意：不能排除 package.json / package-lock.json，否则多阶段构建拿不到依赖清单。
+**/node_modules
+**/dist
+**/test-results
+**/playwright-report
+**/.pytest_cache
+**/__pycache__
+**/*.pyc
+backend/.venv
+backend/.env
+backend/app/static
+.git
+_prototype
+specs
+.gitignore
+frontend/e2e
+frontend/playwright.config.ts

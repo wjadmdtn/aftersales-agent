@@ -1,6 +1,9 @@
 services:
   mock-service:
-    build: ./backend
+    # 上下文是仓库根：多阶段构建要同时拿到 frontend/ 与 backend/
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     ports:
       - "8000:8000"
     environment:

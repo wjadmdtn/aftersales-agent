@@ -20,6 +20,11 @@ dev = [
     "pytest-asyncio>=0.24",
     "fakeredis>=2.26",
 ]
+# 镜像运行 dev_server 用（镜像内不带 Redis，由 fakeredis 顶替）。
+# 不能塞进 dev：镜像只装运行期依赖，dev 组不该进生产镜像。
+serve = [
+    "fakeredis>=2.26",
+]
 
 [build-system]
 requires = ["hatchling"]
