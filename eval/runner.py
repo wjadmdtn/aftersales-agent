@@ -102,6 +102,19 @@ class RecordingLLM:
             self.calls += 1
             self.seconds += time.perf_counter() - start
 
+    async def rerank_policy(self, *, query, clauses):
+        """必须透传：装配层靠 hasattr(llm, "rerank_policy") 决定是否启用 rerank，
+        包装类漏了它，评测就跑在没 rerank 的链路上，回调不出真实效果。"""
+        inner = getattr(self.inner, "rerank_policy", None)
+        if inner is None:
+            raise RuntimeError("inner llm has no rerank_policy")
+        start = time.perf_counter()
+        try:
+            return await inner(query=query, clauses=clauses)
+        finally:
+            self.calls += 1
+            self.seconds += time.perf_counter() - start
+
 
 async def build_env(backend: str, model: str | None, embedder: str = "stub"):
     mock_routes.reset_store()
@@ -138,31 +151,28 @@ async def build_env(backend: str, model: str | None, embedder: str = "stub"):
 
 
 def _build_eval_policy(llm, embedder: str):
-    from app.config import settings
-    from app.policy.embedder import build_embedder
-    from app.policy.seed import load_policies
-    from app.policy.store import InMemoryClauseStore
-    from app.policy.retriever import Retriever
-    from app.services.policy import PolicyService
+    """政策装配走 build_policy_service（与生产同一路径）。
 
-    em = build_embedder(embedder, settings.rag_embedding_dim)
-    clauses = load_policies(settings.policy_seed_path)
-    store = InMemoryClauseStore(clauses, em)
+    此前这里手搓 Retriever + PolicyService，没接关键词召回与 rerank——
+    评测测的是 005 的老链路，后面加的改进在上面零覆盖。
+    """
+    from app.config import settings
 
     if embedder == "stub":
         # 桩向量尺度在 0.0~0.1，用真实阈值会全程 miss。这里放行 top1，只测链路。
-        threshold, margin = 0.0, 0.0
+        # rerank 也关掉：桩模型没有 rerank_policy，开着反而崩。
+        settings.rag_similarity_threshold = 0.0
+        settings.rag_ambiguity_margin = 0.0
+        settings.rag_rerank_enabled = False
     else:
-        threshold, margin = settings.rag_similarity_threshold, settings.rag_ambiguity_margin
+        settings.rag_similarity_threshold = 0.64
+        settings.rag_ambiguity_margin = 0.0
 
-    retriever = Retriever(
-        store=store,
-        embedder=em,
-        similarity_threshold=threshold,
-        ambiguity_margin=margin,
-        top_k=settings.rag_recall_top_k,
-    )
-    return PolicyService(retriever=retriever, llm=llm, timeout_ms=settings.rag_timeout_ms)
+    settings.rag_embedder = embedder
+
+    from app.services.policy import build_policy_service
+
+    return build_policy_service(llm)
 
 
 def _stub_classifier(text: str) -> IntentResult:
