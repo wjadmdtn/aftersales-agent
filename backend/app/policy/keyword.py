@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
+from datetime import date
 
 from app.policy.models import PolicyClause, RetrievedClause
 
@@ -58,10 +59,20 @@ class KeywordIndex:
     """倒排索引：term → {clause_id: 命中次数}。
 
     条款数量在百级，内存足够；接 pgvector 时可迁到 Postgres 全文索引。
+
+    同一 clause_id 可能有多个版本（v3 现在生效、v4 下月生效）。
+    索引按 clause_id 建，因此**必须在检索时按生效期取版本**——
+    否则会返回未来版本的正文，用户被按尚未生效的规则答复。
     """
 
     def __init__(self, clauses: list[PolicyClause]):
-        self.clauses = {c.clause_id: c for c in clauses}
+        # clause_id → [按版本排序的多个 clause]，检索时再挑生效的那条
+        self._by_id: dict[str, list[PolicyClause]] = defaultdict(list)
+        for c in clauses:
+            self._by_id[c.clause_id].append(c)
+        for group in self._by_id.values():
+            group.sort(key=lambda c: c.version)
+
         self._title_terms: dict[str, set[str]] = {}
         self._body_terms: dict[str, set[str]] = {}
         self._exc_terms: dict[str, set[str]] = {}
@@ -76,14 +87,37 @@ class KeywordIndex:
             for exc in c.exceptions:
                 et |= _ngrams(exc)
             et -= tt | bt
-            self._title_terms[c.clause_id] = tt
-            self._body_terms[c.clause_id] = bt
-            self._exc_terms[c.clause_id] = et
+            # 多版本条款取词集**并集**：任一版本命中的词都算召回候选，
+            # 具体用哪个版本在 search 里按 order_date 决定。
+            self._title_terms.setdefault(c.clause_id, set()).update(tt)
+            self._body_terms.setdefault(c.clause_id, set()).update(bt)
+            self._exc_terms.setdefault(c.clause_id, set()).update(et)
             for term in tt | bt | et:
                 self._posting[term].add(c.clause_id)
 
-    def search(self, query: str, *, limit: int, candidates: set[str] | None = None) -> list[RetrievedClause]:
-        """candidates 用于复用向量检索的可见性过滤（品类/生效期）。"""
+    def _pick_version(self, cid: str, order_date: date | None) -> PolicyClause | None:
+        """取在 order_date 当天生效的版本；多个生效时取最高版本。"""
+        group = self._by_id.get(cid)
+        if not group:
+            return None
+        if order_date is None:
+            return group[-1]
+        live = [c for c in group if c.effective_at(order_date)]
+        return live[-1] if live else None
+
+    def search(
+        self,
+        query: str,
+        *,
+        limit: int,
+        candidates: set[str] | None = None,
+        order_date: date | None = None,
+    ) -> list[RetrievedClause]:
+        """candidates 用于复用向量检索的可见性过滤（品类/生效期）。
+
+        order_date 用于在同一 clause_id 的多个版本里挑出当前生效的那条。
+        不传则退化为取最高版本（仅脚本/标定场景使用）。
+        """
         q_terms = _ngrams(query)
         if not q_terms:
             return []
@@ -109,31 +143,49 @@ class KeywordIndex:
             return []
 
         best = max(scores.values())
-        ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)[:limit]
-        return [
-            RetrievedClause(
-                clause=self.clauses[cid],
-                # 归一化到 0~1 只为可比较展示；阈值判断一律用 vector_similarity
-                similarity=score / best,
-                vector_similarity=None,
-                source="keyword",
+        ranked = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
+
+        out: list[RetrievedClause] = []
+        for cid, score in ranked:
+            # 命中词的条款若在 order_date 当天没有任何生效版本，跳过——
+            # 不能拿未来版本的正文回答当前问题。
+            clause = self._pick_version(cid, order_date)
+            if clause is None:
+                continue
+            out.append(
+                RetrievedClause(
+                    clause=clause,
+                    # 归一化到 0~1 只为可比较展示；阈值判断一律用 vector_similarity
+                    similarity=score / best,
+                    vector_similarity=None,
+                    source="keyword",
+                )
             )
-            for cid, score in ranked
-        ]
+            if len(out) >= limit:
+                break
+        return out
 
 
 def rrf_fuse(
     rankings: list[list[RetrievedClause]],
     *,
     k: int = 60,
+    order_date: date | None = None,
 ) -> list[RetrievedClause]:
     """Reciprocal Rank Fusion。
 
     融合后：similarity 保持向量余弦（阈值判断用），fusion_score 用于排序。
     只被关键词召回的条目 vector_similarity=None，retriever 不会把它当成高分。
+
+    order_date：同一 clause_id 的两条路可能召回不同版本（向量路拿 v3、
+    关键词路拿 v4）。不做版本裁决会让未来版本胜出——用户被按尚未生效的
+    规则答复。因此多路命中同 id 时，取 order_date 当天生效的那条版本。
     """
     fused_score: dict[str, float] = defaultdict(float)
     best: dict[str, RetrievedClause] = {}
+
+    def _version_ok(item: RetrievedClause) -> bool:
+        return order_date is None or item.clause.effective_at(order_date)
 
     for ranking in rankings:
         for rank, item in enumerate(ranking, start=1):
@@ -142,14 +194,23 @@ def rrf_fuse(
             prev = best.get(cid)
             if prev is None:
                 best[cid] = item
-            else:
-                # 同一条款被多路召回：保留向量分（若有），补齐来源标记
-                if prev.vector_similarity is None and item.vector_similarity is not None:
+                continue
+
+            prev_ok, item_ok = _version_ok(prev), _version_ok(item)
+            # 生效期优先于向量分：v3 生效 / v4 未生效时，无论分数谁高都留 v3
+            if item_ok and not prev_ok:
+                best[cid] = item
+                continue
+            if prev_ok and not item_ok:
+                continue
+
+            # 同版本（都在 order_date 生效，或都未生效）：保留向量分（若有），补齐来源标记
+            if prev.vector_similarity is None and item.vector_similarity is not None:
+                best[cid] = item
+            elif prev.vector_similarity is not None and item.vector_similarity is not None:
+                # 两路都有向量分时取更高者，语义上等价于"更确定"
+                if item.vector_similarity > prev.vector_similarity:
                     best[cid] = item
-                elif prev.vector_similarity is not None and item.vector_similarity is not None:
-                    # 两路都有向量分时取更高者，语义上等价于"更确定"
-                    if item.vector_similarity > prev.vector_similarity:
-                        best[cid] = item
 
     ordered = sorted(best.values(), key=lambda r: fused_score[r.clause.clause_id], reverse=True)
     out: list[RetrievedClause] = []

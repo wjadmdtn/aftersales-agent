@@ -87,6 +87,44 @@ class SessionRegistry:
             await self._save(st)
         return st
 
+    # ---------- 空闲超时（2026-11-12 口径）----------
+
+    def is_expired(self, st: ChatState | None) -> bool:
+        """超过 chat_inactivity_timeout_s 没有问答即视为会话已结束。"""
+        if st is None:
+            return True
+        from datetime import datetime, timezone
+
+        from app.config import settings
+
+        idle = (datetime.now(timezone.utc) - st.updated_at).total_seconds()
+        return idle > settings.chat_inactivity_timeout_s
+
+    async def touch(self, session_id: str) -> ChatState | None:
+        """有新的问答：刷新活跃时间，推迟超时。"""
+        st = await self.get(session_id)
+        if st is None:
+            return None
+        st.updated_at = utcnow()
+        return await self._save(st)
+
+    async def reset_if_expired(
+        self, session_id: str, *, user_id: str, order_id: str | None = None
+    ) -> ChatState:
+        """超时则开新会话（人工状态一并清掉），否则原样返回。
+
+        用户口径：超时后下次进入是全新会话，由 AI 重新问候；
+        人工状态不保留——5 分钟没回复就等于这次服务结束了。
+        """
+        st = await self.get(session_id)
+        if st is not None and not self.is_expired(st):
+            return st
+        # 状态与抢锁都清掉：不残留 human_serving / agent_id
+        await self.clear(session_id)
+        return await self._save(
+            ChatState(session_id=session_id, user_id=user_id, order_id=order_id)
+        )
+
     async def _collect(self, index_key: str) -> list[ChatState]:
         ids = await self.redis.smembers(index_key)
         out: list[ChatState] = []

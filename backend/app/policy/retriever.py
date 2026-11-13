@@ -70,7 +70,7 @@ class Retriever:
                 categories=categories, product_type=product_type, order_date=order_date
             )
             kw = self.keyword_index.search(
-                query, limit=self.keyword_top_k, candidates=visible
+                query, limit=self.keyword_top_k, candidates=visible, order_date=order_date
             )
             if kw:
                 from app.policy.keyword import rrf_fuse

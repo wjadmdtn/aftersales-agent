@@ -186,7 +186,7 @@ ALL_INTENTS = [
     ("这个能退款吗", Intent.REFUND, IntentMode.INQUIRY),
     ("快递到哪了", Intent.LOGISTICS, IntentMode.QUERY),
     ("订单状态", Intent.QUERY_ORDER, IntentMode.QUERY),
-    ("我要投诉", Intent.COMPLAINT, IntentMode.EXECUTE),
+    ("我要投诉", Intent.UNKNOWN, IntentMode.EXECUTE),
     ("转人工", Intent.MANUAL, IntentMode.EXECUTE),
 ]
 
@@ -268,16 +268,17 @@ async def test_missing_search_query_uses_raw_message(make_loop):
     assert spy.last_kwargs["question"] == "退款多久到账"
 
 
-async def test_miss_falls_back_to_clarify(make_loop):
+async def test_miss_goes_to_handoff(make_loop):
+    """知识库答不了 → 转人工（规范 005：无条款不得编造，转人工）。"""
     miss = _MissPolicy()
     responses = {"你们老板是谁": IntentResult(intent=Intent.POLICY, confidence=0.8)}
-    loop, _ = make_loop(miss, responses=responses)
+    loop, _ = make_loop(miss, responses=responses, with_coordinator=True)
 
     reply = await loop.handle(
         session_id="s1", user_id="u1", message="你们老板是谁", trace_id="t1", order_id="ORD1002"
     )
     assert miss.calls == 1
-    assert reply.state == "clarifying"
+    assert reply.state == "handoff_queued"
 
 
 async def test_ambiguous_asks_instead_of_answering(make_loop):
@@ -337,43 +338,37 @@ async def test_rerank_rejected_handoff_carries_boundary_trigger(make_loop):
     assert "rerank" in ctx.trigger_detail
 
 
-async def test_low_score_miss_still_clarifies(make_loop):
-    """检索层分数不够（没进 rerank）≠ 知识缺口：可能只是表述问题，
-    仍走澄清，不直接转人工。"""
+async def test_low_score_miss_goes_to_handoff(make_loop):
+    """检索层分数不够 = 答不了 → 转人工。
+
+    对用户而言"没找到条款"和"条款全被判无关"没有区别，都是没有答案。
+    口径 2026-11-13：不再走反问引导。"""
     policy = _LowScoreMissPolicy()
     loop, _ = make_loop(policy, responses={
         RERANK_MSG: IntentResult(intent=Intent.POLICY, confidence=0.8)
-    })
+    }, with_coordinator=True)
 
     reply = await loop.handle(
         session_id="s-b3", user_id="u1", message=RERANK_MSG, trace_id="t1", order_id="ORD1002"
     )
     assert policy.calls == 1
-    assert reply.state == "clarifying"
+    assert reply.state == "handoff_queued"
 
 
-async def test_low_score_miss_handoff_after_clarify_limit_uses_boundary(make_loop):
-    """澄清 2 轮耗尽后转人工时，本轮检索分数低 → 触发 BOUNDARY，
-    而不是兜底的 USER_REQUEST 话术。"""
-    from app.models.handoff import TriggerType
+async def test_policy_miss_handoffs_on_first_turn(make_loop):
+    """检索层 miss 第一轮就转人工，不再拖到"轮次耗尽"。
 
-    from app.config import settings
-
+    口径 2026-11-13：知识库答不了交给人工，不消耗用户轮次。
+    """
     policy = _LowScoreMissPolicy()
-    msgs = [RERANK_MSG, "就是吊牌的事", "你们到底怎么处理"]
     loop, _ = make_loop(policy, responses={
-        m: IntentResult(intent=Intent.POLICY, confidence=0.8) for m in msgs
+        RERANK_MSG: IntentResult(intent=Intent.POLICY, confidence=0.8)
     }, with_coordinator=True)
 
-    for i, m in enumerate(msgs):
-        reply = await loop.handle(
-            session_id="s-b4", user_id="u1", message=m, trace_id=f"t{i}", order_id="ORD1002"
-        )
-
+    reply = await loop.handle(
+        session_id="s-b4", user_id="u1", message=RERANK_MSG, trace_id="t0", order_id="ORD1002"
+    )
     assert reply.state == "handoff_queued"
-    assert reply.reply == settings.handoff_scripts["boundary"]
-    ctx = await loop.coordinator.queue.get_pack("s-b4")
-    assert ctx.trigger_type is TriggerType.BOUNDARY
 
 
 async def test_degraded_never_retrieves(make_loop):
@@ -387,14 +382,15 @@ async def test_degraded_never_retrieves(make_loop):
     assert reply.state.startswith("degraded")
 
 
-async def test_no_policy_service_still_works(make_loop):
+async def test_no_policy_service_goes_to_handoff(make_loop):
+    """政策服务不可用 = 答不了 → 转人工。"""
     responses = {"退款多久到账": IntentResult(intent=Intent.POLICY, confidence=0.8)}
-    loop, _ = make_loop(None, responses=responses)
+    loop, _ = make_loop(None, responses=responses, with_coordinator=True)
 
     reply = await loop.handle(
         session_id="s1", user_id="u1", message="退款多久到账", trace_id="t1", order_id="ORD1002"
     )
-    assert reply.state == "clarifying"
+    assert reply.state == "handoff_queued"
 
 
 async def test_session_records_cited_clauses(make_loop):
@@ -447,11 +443,11 @@ async def test_timeout_degrades_to_miss(make_loop):
 
     loop, _ = make_loop(service, responses={
         "退款多久到账": IntentResult(intent=Intent.POLICY, confidence=0.8)
-    })
+    }, with_coordinator=True)
     reply = await loop.handle(
         session_id="s1", user_id="u1", message="退款多久到账", trace_id="t1", order_id="ORD1002"
     )
-    assert reply.state == "clarifying", "检索超时应回落澄清，而不是报错"
+    assert reply.state == "handoff_queued", "检索超时视为答不了，转人工而不是报错"
 
 
 async def test_business_intent_does_not_retrieve(make_loop):
@@ -470,7 +466,7 @@ async def test_business_intent_does_not_retrieve(make_loop):
 async def test_clarify_does_not_retrieve(make_loop):
     """说不清的问题走澄清，不查政策。"""
     policy = _MissPolicy()
-    responses = {"这个东西不好用": IntentResult(intent=Intent.GENERAL, confidence=0.7)}
+    responses = {"这个东西不好用": IntentResult(intent=Intent.UNKNOWN, confidence=0.7)}
     loop, _ = make_loop(policy, responses=responses)
 
     reply = await loop.handle(

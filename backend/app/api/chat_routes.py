@@ -24,17 +24,26 @@ async def get_session(
         raise HTTPException(
             status_code=404, detail={"code": "session_not_found", "message": "会话不存在"}
         )
+    # 只报告是否超时，**不重置**：本接口是只读的。
+    # 若在这里重置，用户刷新一下就把人工状态清掉了——刷新不该有副作用。
+    # 真正的重置发生在用户发消息（WS inbound）或建立连接时。
+    expired = rt.registry.is_expired(state)
     page = await rt.messages.backfill(
         session_id, after_seq=after_seq, limit=limit or 200
     )
     state = await rt.registry.touch_seq(session_id, page.last_seq)
     state_dump = state.model_dump(mode="json")
-    state_dump["ui_state"] = UI_STATE_OF[state.state]
+    ui_state = UI_STATE_OF[state.state]
+    if expired:
+        # 对外呈现"已结束"：历史照常给，但不该再显示 human_serving 在服务
+        ui_state = "resolved"
+    state_dump["ui_state"] = ui_state
     return {
         "state": state_dump,
         "messages": [m.model_dump(mode="json") for m in page.messages],
         "last_seq": page.last_seq,
         "truncated": page.truncated,
+        "expired": expired,
     }
 
 

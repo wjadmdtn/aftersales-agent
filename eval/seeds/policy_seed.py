@@ -65,7 +65,7 @@ NEGATIVE = [
     ("neg-logistics", "我的快递到哪了", "logistics"),
     ("neg-address", "帮我改一下地址", "change_address"),
     ("neg-order", "查一下我的订单", "query_order"),
-    ("neg-vague", "这个东西不好用", "general"),
+    ("neg-vague", "这个东西不好用", "unknown"),
 ]
 
 

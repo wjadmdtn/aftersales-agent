@@ -206,12 +206,6 @@ class AgentLoop:
                 state, message, primary_intent="manual", trace_id=trace_id
             )
 
-        if intent is Intent.COMPLAINT:
-            # 投诉一律走人工：风险触发，跳过自助建议，优先级高
-            return await self._handoff(
-                state, message, primary_intent="complaint", trace_id=trace_id
-            )
-
         if intent is Intent.POLICY:
             # 只有 policy 意图才走检索。业务动作不必查政策——既慢又答非所问。
             # search_query：意图识别同一次调用顺带产出的改写查询，不额外花调用
@@ -220,18 +214,27 @@ class AgentLoop:
             )
             if policy_reply is not None:
                 return policy_reply
-            # 检索不到：不猜、不编，交回澄清或转人工。
-            # 相似度信号随澄清传递：2 轮耗尽转人工时，check_boundary 用它判 BOUNDARY。
-            return await self._clarify(
+            # 知识库答不了 → 转人工（规范 005 FR：无条款不得编造，转人工）。
+            # 检索层 miss 与 rerank 判死都算"答不了"：
+            # 前者是没找到候选，后者是候选全被判无关，对用户而言都是没有答案。
+            # 不再走反问引导——用户问的是规则，换个说法也还是答不出。
+            from app.models.handoff import TriggerResult, TriggerType
+
+            return await self._handoff(
                 state,
                 message,
+                primary_intent="policy",
                 trace_id=trace_id,
-                rag_top_similarity=retrieval.top_similarity if retrieval else None,
+                forced_trigger=TriggerResult.fire(
+                    TriggerType.BOUNDARY,
+                    retrieval.reason if retrieval else "政策检索未命中",
+                ),
+                reply_intent=Intent.POLICY,
             )
 
-        # 无法识别可调用的工具：澄清优先，转人工是最后手段。
-        # "AI 一时没理解"不等于"用户需要人工"——直接转会把人工成本吃光。
-        return await self._clarify(state, message, trace_id=trace_id)
+        # UNKNOWN（诉求不明，含抱怨/闲聊/无法归类）：只安抚，不追问、不转人工、不调工具。
+        # 情绪类不该被 AI 反复盘问，也不该把人工成本吃光。
+        return await self._clarify(state, message, trace_id=trace_id, comfort_only=True)
 
     async def _try_policy(
         self,
@@ -272,32 +275,16 @@ class AgentLoop:
             return (
                 AgentReply(
                     reply=answer.ambiguity_question or "您能再具体说一下是想问哪方面吗？",
-                    intent=None,
+                    intent=Intent.POLICY,
                     state="clarifying",
                 ),
                 retrieval,
             )
 
         if answer.decision is RetrievalDecision.MISS or not answer.answer:
-            # rerank 全剔除 = 模型确认知识库里没有能回答的条款（知识缺口）。
-            # 换个表述也不会有答案，追问无意义——直接按能力边界转人工，
-            # 不走 2 轮追问。检索层 miss（分数不够没进 rerank）仍交回澄清。
-            if retrieval is not None and retrieval.rerank_rejected:
-                from app.models.handoff import TriggerResult, TriggerType
-
-                return (
-                    await self._handoff(
-                        state,
-                        message,
-                        primary_intent="policy",
-                        trace_id=trace_id,
-                        forced_trigger=TriggerResult.fire(
-                            TriggerType.BOUNDARY, retrieval.reason
-                        ),
-                        reply_intent=Intent.POLICY,
-                    ),
-                    retrieval,
-                )
+            # 答不了：不论是 rerank 全剔除（条款存在但都不能回答）
+            # 还是检索层没找到候选，都由调用方统一转人工。
+            # 不在这一层转接，避免与调用方重复处理。
             return None, retrieval
 
         state.last_cited_clause_ids = list(answer.cited_clause_ids)
@@ -321,30 +308,44 @@ class AgentLoop:
         *,
         trace_id: str,
         rag_top_similarity: float | None = None,
+        comfort_only: bool = False,
     ) -> AgentReply:
+        """诉求不明时的回应。
+
+        产品口径（2026-11-13）：
+        - comfort_only=True（UNKNOWN）：再按情绪细分
+            · 有负面情绪 → 只安抚道歉，不追问、不转人工（用户想推进会自己说）
+            · 无情绪（闲聊/误触）→ 简短引导一句，不道歉
+        - comfort_only=False（POLICY 检索无结果）：走反问引导，把诉求问出来。
+
+        两种都不主动提"要不要转人工"——转人工只有在用户主动要（manual）
+        或系统异常/能力边界时才发生。
+        """
         state.clarify_round += 1
 
-        if state.clarify_round > self.CLARIFY_ROUND_LIMIT:
-            state.clarify_round = 0
-            return await self._handoff(
-                state,
-                message,
-                primary_intent="general",
-                trace_id=trace_id,
-                rag_top_similarity=rag_top_similarity,
-            )
-
-        from app.agent.clarify import clarify_round_one, clarify_round_two
+        from app.agent.clarify import clarify_round_one, clarify_round_two, comfort_reply
         from app.handoff.emotion import detect_emotion
         from app.models.handoff import Emotion
 
-        if state.clarify_round == 1:
-            negative = detect_emotion(message) is not Emotion.NEUTRAL
+        # 跨轮保留检索信号：后续若因别的条件转人工，还要用它判断是否知识缺口
+        if rag_top_similarity is not None:
+            state.last_rag_top_similarity = rag_top_similarity
+
+        negative = detect_emotion(message) is not Emotion.NEUTRAL
+
+        if comfort_only and negative:
+            # 情绪类：只道歉，不追问
+            reply = comfort_reply()
+        elif comfort_only:
+            # 无关/闲聊：不道歉，只做最小引导
+            reply = clarify_round_one(negative=False)
+        elif state.clarify_round == 1:
             reply = clarify_round_one(negative=negative)
         else:
             reply = clarify_round_two()
 
-        return AgentReply(reply=reply, intent=None, state="clarifying")
+        # 意图必须回传：评测与前端都靠它区分"抱怨"与"问政策但没检索到"
+        return AgentReply(reply=reply, intent=state.intent, state="clarifying")
 
     async def _handoff(
         self,
@@ -369,13 +370,13 @@ class AgentLoop:
                 user_message=message, rag_top_similarity=rag_top_similarity
             )
         if not trigger.triggered:
-            # 意图是 manual/complaint 但关键词没命中时，仍按该意图转接
+            # 走到这里只剩"意图是 manual 但没命中人工关键词"的情形。
+            # 投诉/差评不再自动转人工（2026-11-13 口径），全部由 AI 安抚。
             from app.models.handoff import TriggerResult, TriggerType
 
             trigger = TriggerResult.fire(
-                TriggerType.RISK if primary_intent == "complaint" else TriggerType.USER_REQUEST,
+                TriggerType.USER_REQUEST,
                 f"意图识别为 {primary_intent}",
-                skip_self_service=(primary_intent == "complaint"),
             )
 
         outcome = await self.coordinator.initiate(
@@ -391,7 +392,7 @@ class AgentLoop:
         if self.on_handoff is not None:
             await self.on_handoff(state.session_id, outcome.state)
         if reply_intent is None:
-            reply_intent = Intent.MANUAL if primary_intent == "manual" else Intent.COMPLAINT
+            reply_intent = Intent.MANUAL
         return AgentReply(
             reply=outcome.reply,
             intent=reply_intent,

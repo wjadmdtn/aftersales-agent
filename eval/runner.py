@@ -192,7 +192,8 @@ def _stub_classifier(text: str) -> IntentResult:
 
     table = [
         (("转人工", "人工", "真人", "客服电话"), Intent.MANUAL),
-        (("投诉", "差评", "骗子", "起诉", "举报", "12315"), Intent.COMPLAINT),
+        # 投诉/差评不再是独立意图（2026-11-13），归入 UNKNOWN 走安抚
+        (("投诉", "差评", "骗子", "起诉", "举报", "12315"), Intent.UNKNOWN),
         (("退款", "退货", "退钱", "退了", "退掉", "退我"), Intent.REFUND),
         (("物流", "快递", "包裹", "到哪", "发货"), Intent.LOGISTICS),
         (("地址",), Intent.CHANGE_ADDRESS),
@@ -201,7 +202,7 @@ def _stub_classifier(text: str) -> IntentResult:
     for words, intent in table:
         if any(w in text for w in words):
             return IntentResult(intent=intent, confidence=0.9)
-    return IntentResult(intent=Intent.GENERAL, confidence=0.5)
+    return IntentResult(intent=Intent.UNKNOWN, confidence=0.5)
 
 
 async def run_case(client, mock_app, case: EvalCase, trace: str) -> dict:

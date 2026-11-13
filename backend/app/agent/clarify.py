@@ -6,9 +6,15 @@ APOLOGY = "非常抱歉给您带来了不好的体验。"
 CLARIFY_FIRST_NEGATIVE = APOLOGY + "方便说下具体情况吗？我帮您记录一下。"
 CLARIFY_FIRST_NEUTRAL = "方便说下您遇到的具体情况吗？我帮您看看怎么处理。"
 
-# 第 2 轮改为征求转人工，不再列业务选项。
-# 列选项本质上是在引导用户走某条路，仍然有暗示承诺的风险。
-CLARIFY_SECOND = "了解了。为了不耽误您，需要我帮您转接到人工客服详细沟通吗？"
+# 第 2 轮继续追问，**不再征求转人工**。
+# 产品口径：抱怨类不该被推向人工；只有明确投诉/要人工/差评才转，
+# 那些在意图层就拦下了。这里只负责把诉求问出来。
+CLARIFY_SECOND = "了解了。方便再具体说下是哪方面的问题吗？比如是商品本身、物流时效，还是操作上的问题？"
+
+# 情绪类唯一的回应：只道歉安抚，不追问、不引导、不承诺。
+# 口径（2026-11-13）：User 表达不满但没提诉求时，AI 不做任何别的操作。
+# 追问细节会把"吐槽"变成"被盘问"；转人工则把人工成本吃光。
+COMFORT = APOLOGY
 
 ALL_SCRIPTS = (CLARIFY_FIRST_NEGATIVE, CLARIFY_FIRST_NEUTRAL, CLARIFY_SECOND, APOLOGY)
 
@@ -36,3 +42,39 @@ def clarify_round_one(*, negative: bool) -> str:
 
 def clarify_round_two() -> str:
     return CLARIFY_SECOND
+
+
+def comfort_reply() -> str:
+    """情绪类唯一回应：一句道歉，别的什么都不做。多轮重复此句。"""
+    return COMFORT
+
+
+# AI 问过"需要帮您转接到人工客服吗"之后，用户可能这样回答。
+# 拒绝判定用"句首/短句包含"，因为真实回答常带后文：
+#   「不用 之前退货就很麻烦」「算了，我就是吐槽一下」
+REFUSE_PREFIXES = (
+    "不用", "不需要", "不要", "不了", "先不", "算了", "暂时不",
+    "别", "无需", "没事", "不必", "不想",
+)
+AGREE_WORDS = frozenset({"好的", "好", "可以", "行", "要", "需要", "转吧", "转", "嗯", "对", "是的"})
+
+
+def is_handoff_refusal(text: str) -> bool:
+    """用户是否在拒绝转人工。
+
+    只认句首：句中出现"不要"不代表拒绝（"东西我不要了"是退款诉求）。
+    """
+    t = text.strip()
+    if not t:
+        return False
+    # 独立成句的短回答
+    if t in ("不", "否"):
+        return True
+    head = t[:6]
+    return any(head.startswith(p) for p in REFUSE_PREFIXES)
+
+
+def is_handoff_agreement(text: str) -> bool:
+    """用户是否同意转人工（精确匹配短回答，避免"好的"被误当成其他意思）。"""
+    t = text.strip().rstrip("。！!~～ ")
+    return t in AGREE_WORDS

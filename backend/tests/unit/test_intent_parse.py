@@ -48,13 +48,13 @@ async def test_hints_do_not_change_outcome(user_input, hint_present):
 
 
 async def test_keyword_hit_does_not_force_intent():
-    """含"退款"二字但当 LLM 判定为投诉时，结果必须是投诉。"""
+    """含"退款"二字但当 LLM 判定诉求不明时，结果必须是 UNKNOWN。"""
     text = "再不处理我就投诉你们不肯退款"
-    stub = StubLLMClient(classifier=lambda s: IntentResult(intent=Intent.COMPLAINT, confidence=0.88))
+    stub = StubLLMClient(classifier=lambda s: IntentResult(intent=Intent.UNKNOWN, confidence=0.88))
     classifier = IntentClassifier(stub, KEYWORDS)
 
     result, _ = await classifier.classify(text)
-    assert result.intent is Intent.COMPLAINT
+    assert result.intent is Intent.UNKNOWN
     assert "退款" in stub.last_hints, "词确实命中了"
 
 
@@ -68,7 +68,7 @@ async def test_returns_error_on_llm_failure():
 async def test_result_source_is_llm():
     from app.models.agent import IntentSource
 
-    stub = StubLLMClient(default=IntentResult(intent=Intent.GENERAL, confidence=0.4))
+    stub = StubLLMClient(default=IntentResult(intent=Intent.UNKNOWN, confidence=0.4))
     classifier = IntentClassifier(stub, KEYWORDS)
     result, _ = await classifier.classify("随便")
     assert result.source is IntentSource.LLM

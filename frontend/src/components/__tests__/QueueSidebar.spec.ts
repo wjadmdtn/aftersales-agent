@@ -57,4 +57,55 @@ describe('QueueSidebar', () => {
     await w.find('[data-test="queue-s1"]').trigger('click')
     expect(w.emitted('select')?.[0]).toEqual(['s1'])
   })
+
+  it('刷新后队列为空，仍能看到我已接入的会话', () => {
+    // 真实缺陷：刷新后队列空了，左侧一片空白，之前接入的会话找不到入口。
+    // 已接入的会话不在队列里，必须单独一组展示。
+    const w = mount(QueueSidebar, {
+      props: {
+        items: [],
+        mine: [
+          {
+            session_id: 's9',
+            state: 'human_serving',
+            agent_id: 'demo-agent',
+            agent_name: '小王',
+            order_id: 'ORD1002',
+            last_message: '正在为您处理',
+            last_ts: '',
+          },
+        ],
+      },
+    })
+    expect(w.find('[data-test="my-sessions"]').exists()).toBe(true)
+    expect(w.find('[data-test="mine-s9"]').exists()).toBe(true)
+    expect(w.text()).toContain('服务中')
+    expect(w.text()).toContain('正在为您处理')
+  })
+
+  it('点击我的会话 emit select', async () => {
+    const w = mount(QueueSidebar, {
+      props: {
+        items: [],
+        mine: [
+          {
+            session_id: 's9',
+            state: 'human_serving',
+            agent_id: 'a',
+            agent_name: '小王',
+            order_id: null,
+            last_message: null,
+            last_ts: '',
+          },
+        ],
+      },
+    })
+    await w.find('[data-test="mine-s9"]').trigger('click')
+    expect(w.emitted('select')?.[0]).toEqual(['s9'])
+  })
+
+  it('没有我的会话时不渲染该区块', () => {
+    const w = mount(QueueSidebar, { props: { items: [] } })
+    expect(w.find('[data-test="my-sessions"]').exists()).toBe(false)
+  })
 })

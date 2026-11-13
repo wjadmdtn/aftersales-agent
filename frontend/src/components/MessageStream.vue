@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { nextTick, ref, watch } from 'vue'
 import type { ChatMessage, PendingAssistant } from '@/types'
 
-defineProps<{
+const props = defineProps<{
   messages: ChatMessage[]
   pending?: PendingAssistant | null
   degraded?: boolean
@@ -16,10 +17,63 @@ const ROLE_LABEL: Record<string, string> = {
   human: '人工客服',
   system: '系统',
 }
+
+// ---- 自动滚到底部 ----
+// 聊天窗口的心智模型是"最新消息总在底部"。此前完全没有滚动逻辑，
+// 用户发完消息还得自己往下拖才能看到回复。
+const streamEl = ref<HTMLElement | null>(null)
+// 用户主动往上翻看历史时不要强行拽回底部——那会打断阅读。
+// 只有原本就贴在底部（或自己发的消息）才自动跟随。
+const pinnedToBottom = ref(true)
+
+const NEAR_BOTTOM_PX = 80
+
+function onScroll() {
+  const el = streamEl.value
+  if (!el) return
+  const distance = el.scrollHeight - el.scrollTop - el.clientHeight
+  pinnedToBottom.value = distance <= NEAR_BOTTOM_PX
+}
+
+function scrollToBottom(smooth = false) {
+  const el = streamEl.value
+  if (!el) return
+  el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' })
+}
+
+async function followIfPinned() {
+  if (!pinnedToBottom.value) return
+  await nextTick()
+  scrollToBottom(true)
+}
+
+// 新消息到达（含自己发的）
+watch(() => props.messages.length, followIfPinned)
+// 流式输出过程中也要跟随，否则长回复会撑出可视区
+watch(
+  () => props.pending?.text,
+  async () => {
+    if (!pinnedToBottom.value) return
+    await nextTick()
+    scrollToBottom()
+  },
+)
+// 出现等待占位（刚发出消息）一定回到底部——这是用户自己的操作
+watch(
+  () => Boolean(props.pending),
+  async (has) => {
+    if (!has) return
+    pinnedToBottom.value = true
+    await nextTick()
+    scrollToBottom(true)
+  },
+)
+
+defineExpose({ scrollToBottom })
 </script>
 
 <template>
-  <div class="stream" data-test="message-stream">
+  <div ref="streamEl" class="stream" data-test="message-stream" @scroll.passive="onScroll">
     <div
       v-for="m in messages"
       :key="m.seq"
@@ -33,7 +87,11 @@ const ROLE_LABEL: Record<string, string> = {
 
     <div v-if="pending" class="msg msg--assistant" data-test="msg-pending">
       <div class="meta">AI 助手</div>
-      <div class="bubble">{{ pending.text }}</div>
+      <!-- 首个 delta 到达前 text 为空：显示"正在输入"，否则是空白气泡 -->
+      <div v-if="!pending.text" class="bubble bubble--typing" data-test="typing">
+        <span class="dot" /><span class="dot" /><span class="dot" />
+      </div>
+      <div v-else class="bubble">{{ pending.text }}</div>
     </div>
 
     <div v-if="degraded" class="degrade" data-test="degraded">
@@ -111,5 +169,34 @@ const ROLE_LABEL: Record<string, string> = {
   align-items: center;
   color: #e6a23c;
   font-size: 13px;
+}
+
+/* 正在输入：三点跳动。政策链路首次响应可达 20~40s，必须有可见反馈 */
+.bubble--typing {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  min-width: 48px;
+}
+
+.bubble--typing .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #909399;
+  animation: typing-bounce 1.2s infinite ease-in-out;
+}
+
+.bubble--typing .dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.bubble--typing .dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes typing-bounce {
+  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-3px); }
 }
 </style>

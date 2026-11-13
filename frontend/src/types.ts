@@ -73,6 +73,17 @@ export interface QueueItem {
   queued_at: string
 }
 
+/** GET /chat/sessions?agent_id= 的条目：我已接入的会话 */
+export interface MySession {
+  session_id: string
+  state: string
+  agent_id: string | null
+  agent_name: string | null
+  order_id: string | null
+  last_message: string | null
+  last_ts: string
+}
+
 export interface PendingAssistant {
   msg_id: string
   seq: number

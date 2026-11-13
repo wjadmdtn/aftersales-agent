@@ -26,10 +26,9 @@ _INTENT_LABEL = {
     "change_address": "修改收货地址",
     "logistics": "查询物流",
     "query_order": "查询订单",
-    "complaint": "投诉",
     "manual": "要求人工",
     "policy": "政策咨询",
-    "general": "未识别诉求",
+    "unknown": "未识别诉求",
 }
 
 _TRIGGER_LABEL = {
@@ -44,7 +43,6 @@ _SUGGESTION = {
     "change_address": "确认未发货后修改地址",
     "logistics": "查询物流轨迹并同步给用户",
     "query_order": "核对订单信息",
-    "complaint": "记录投诉并升级处理",
 }
 
 

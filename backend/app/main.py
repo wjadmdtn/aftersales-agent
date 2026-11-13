@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 def _build_llm():
     """无 LLM 配置时用带演示响应表的桩。
 
-    StubLLMClient 默认返回 GENERAL，未登记的句子会全部走澄清，
+    StubLLMClient 默认返回 UNKNOWN，未登记的句子会全部走安抚/澄清，
     本地演示与 E2E 必须先登记（plan Q7）。
     """
     from app.agent.llm.stub import StubLLMClient

@@ -28,7 +28,7 @@ class StubLLMClient:
         policy_default: PolicyAnswer | None = None,
     ):
         self.responses = responses or {}
-        self.default = default or IntentResult(intent=Intent.GENERAL, confidence=0.5)
+        self.default = default or IntentResult(intent=Intent.UNKNOWN, confidence=0.5)
         self.fail_mode = fail_mode
         self.fail_times = fail_times
         self.delay_ms = delay_ms

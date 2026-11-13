@@ -10,14 +10,22 @@ from pydantic import BaseModel, Field
 
 
 class Intent(StrEnum):
+    """六个业务意图 + 一个兜底。
+
+    2026-11-13 口径：删除 complaint / general 两个语义桶。
+    - 抱怨、不满、情绪化表达不再是独立意图，统一落 UNKNOWN，
+      由 AI 安抚即可，不转人工、不做业务动作。
+    - 转人工只由用户主动触发（manual）+ 系统异常/能力边界两条例外。
+    """
+
     REFUND = "refund"
     LOGISTICS = "logistics"
     CHANGE_ADDRESS = "change_address"
     QUERY_ORDER = "query_order"
-    COMPLAINT = "complaint"
     MANUAL = "manual"
     POLICY = "policy"      # 政策咨询：规则是什么，不是"我这一单怎样"
-    GENERAL = "general"
+    # 诉求不明（含抱怨、闲聊、无法归类）。行为 == 安抚/澄清，绝不调工具、绝不转人工。
+    UNKNOWN = "unknown"
 
 
 # 只有这四个意图会映射到 mock 服务的业务能力
@@ -99,6 +107,8 @@ class SessionState(BaseModel):
     intent: Intent | None = None
     turn_count: int = 0
     clarify_round: int = 0
+    # 最近一次政策检索的 top 相似度。跨轮保留，转人工时用它判断是否知识缺口。
+    last_rag_top_similarity: float | None = None
     # 政策检索：最近一次引用的条款（多轮追问用）与发生检索的轮次数（评测用）
     last_cited_clause_ids: list[str] = Field(default_factory=list)
     policy_turns: int = 0

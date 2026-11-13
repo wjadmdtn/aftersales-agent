@@ -62,7 +62,7 @@ async def env():
         "快递到哪了": IntentResult(intent=Intent.LOGISTICS, confidence=0.92),
         "订单状态": IntentResult(intent=Intent.QUERY_ORDER, confidence=0.9),
         "转人工": IntentResult(intent=Intent.MANUAL, confidence=0.9),
-        "我要投诉": IntentResult(intent=Intent.COMPLAINT, confidence=0.9),
+        "我要投诉": IntentResult(intent=Intent.UNKNOWN, confidence=0.9),
     }
     stub = StubLLMClient(responses)
     classifier = IntentClassifier(stub, keyword_map={})

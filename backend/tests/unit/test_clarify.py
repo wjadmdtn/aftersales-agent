@@ -38,10 +38,15 @@ def test_apology_is_uniform():
     assert APOLOGY == "非常抱歉给您带来了不好的体验。"
 
 
-def test_round_two_offers_handoff_not_options():
-    """第 2 轮不再列业务选项——列选项仍然是在引导用户走某条路。"""
+def test_round_two_keeps_asking_not_handoff():
+    """第 2 轮继续追问，不征求转人工，也不列业务选项（口径 2026-11-12）。
+
+    列选项是在引导用户走某条路；征求转人工会把只想吐槽的用户推进队列。
+    """
     text = clarify_round_two()
-    assert "转接" in text or "人工" in text
+    assert "人工" not in text and "转接" not in text
+    # 必须仍然是在问问题
+    assert "?" in text or "？" in text
     for opt in ("查询订单", "修改收货地址", "申请退款", "其他问题"):
         assert opt not in text
 

@@ -171,7 +171,7 @@ class _KwBoostIndex:
     def __init__(self, clause):
         self.clause = clause
 
-    def search(self, query, *, limit, candidates=None):
+    def search(self, query, *, limit, candidates=None, order_date=None):
         return [
             RetrievedClause(
                 clause=self.clause, similarity=1.0, vector_similarity=None, source="keyword"

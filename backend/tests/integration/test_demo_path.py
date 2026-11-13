@@ -62,26 +62,21 @@ def test_demo_path_end_to_end(http, ws_user, ws_agent):
     done = user.recv_until("assistant.done")
     assert "已为您提交退款" in done["payload"]["text"]
 
-    # ---- ④ 投诉 → 转人工 ----
-    user.send({"type": "user.message", "payload": {"text": "我要投诉"}})
+    # ---- ④ 用户主动转人工 → 入队 ----
+    # 2026-11-13 口径：投诉不再自动转人工，转人工由用户主动触发（按钮 / 说"转人工"）。
+    # 快捷转人工不产生 assistant.done，只广播 session.state。
+    user.send({"type": "user.handoff", "payload": {}})
     t_queue = time.monotonic()
 
-    # 转人工同时产生 assistant.done 与 session.state，顺序不保证，
-    # 因此一次读到两帧都齐了为止
-    got_done = got_state = None
+    got_state = None
     for _ in range(30):
         f = user.recv()
-        if f["type"] == "assistant.done" and got_done is None:
-            got_done = f
-        elif f["type"] == "session.state" and f["payload"].get("ui_state") == "queued":
+        if f["type"] == "session.state" and f["payload"].get("ui_state") == "queued":
             got_state = f
-        if got_done and got_state:
             break
         if f["type"] in ("ping", "hello", "user.message.ack"):
             continue
 
-    assert got_done is not None, "没有收到转人工回复"
-    assert "人工客服" in got_done["payload"]["text"]
     assert got_state is not None, "没有收到排队状态广播"
     # SC-003：状态同步 < 1s
     assert time.monotonic() - t_queue < 1.0
@@ -91,9 +86,9 @@ def test_demo_path_end_to_end(http, ws_user, ws_agent):
 
     queue = http.get("/handoff/queue").json()["items"]
     assert queue[0]["session_id"] == "demo"
-    assert queue[0]["priority"] == "high"
-    assert queue[0]["trigger_type"] == "risk"
-    assert queue[0]["suggested_next_step"] is None, "风险场景不得给 AI 建议"
+    assert queue[0]["priority"] == "medium"
+    assert queue[0]["trigger_type"] == "user_request"
+    assert "suggested_next_step" in queue[0]
 
     # ---- ⑥ 上下文包字段齐全（SC-004）----
     ctx = queue[0]

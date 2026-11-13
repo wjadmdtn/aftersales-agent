@@ -114,6 +114,23 @@ async def handle_user_message(conn: Connection, frame: Envelope) -> None:
     if not text:
         return
 
+    # 空闲超时：5 分钟没问答视为上次会话已结束，本条消息开新会话。
+    # 人工状态一并清掉——超时后不该还挂在某人名下。
+    if rt.registry.is_expired(state):
+        state = await rt.registry.reset_if_expired(
+            session_id, user_id=conn.user_id or "u"
+        )
+        conn.send(
+            envelope(
+                MessageType.SESSION_STATE,
+                session_id=session_id,
+                payload={"ui_state": "ai_serving", "state": state.state.value,
+                         "expired": True},
+            )
+        )
+    else:
+        await rt.registry.touch(session_id)
+
     if state is not None and state.state is HandoffState.RESOLVED:
         conn.send(
             envelope(

@@ -35,7 +35,7 @@ def compute_metrics(results: list[GradeResult]) -> list[MetricLine]:
     for cat in _categories(by_path[EvalPath.BUSINESS_ACTION]):
         add(f"业务动作-{cat}", [r for r in by_path[EvalPath.BUSINESS_ACTION] if r.category == cat])
 
-    add("澄清正确率", by_path[EvalPath.CLARIFY])
+    add("反问引导正确率", by_path[EvalPath.CLARIFY])
     add("无关输入正确率", by_path[EvalPath.IRRELEVANT])
     add("转人工正确率", by_path[EvalPath.HANDOFF])
     add("端到端成功率", by_path[EvalPath.E2E])

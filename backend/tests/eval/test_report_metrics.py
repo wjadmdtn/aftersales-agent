@@ -27,7 +27,7 @@ def test_over_handoff_is_separate_metric():
     ]
     metrics = {m.name: m for m in compute_metrics(results)}
     assert metrics["过度转接率"].value == 0.25
-    assert metrics["澄清正确率"].value == 0.75
+    assert metrics["反问引导正确率"].value == 0.75
 
 
 def test_false_negative_and_false_positive_separate():

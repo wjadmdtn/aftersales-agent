@@ -52,8 +52,10 @@ class Settings(BaseSettings):
     user_request_keywords_raw: str = Field(
         default='["转人工","人工客服","人工","找真人","真人","找客服"]'
     )
+    # 2026-11-13：投诉/差评不再自动转人工，但这些词代表用户已明显不满，
+    # 归入情绪判定——UNKNOWN 分支据此决定"安抚"还是"仅引导"。
     angry_keywords_raw: str = Field(
-        default='["垃圾","骗子","太差了","恶心","差评","坑人","废物","滚","什么破"]'
+        default='["垃圾","骗子","太差了","恶心","差评","坑人","废物","滚","什么破","投诉","欺诈","曝光","举报","起诉","12315","消协"]'
     )
     negative_keywords_raw: str = Field(default='["不满意","生气","失望","麻烦","怎么回事","不好用","不好使","用不了","有问题","坏了","划痕","破损","质量差","太慢","等太久","和图片不一样","是坏的","废品","完全不能用","等半天","效率太低","让人无语","不太行","质量不行","跟描述","不一样"]')
     tool_failure_threshold: int = Field(default=3, ge=1)
@@ -88,6 +90,9 @@ class Settings(BaseSettings):
     ws_inbound_rate_window_s: int = Field(default=5, gt=0)
     # 与 session_ttl_seconds 同寿命：会话过期后消息不应比会话活得更久
     chat_message_ttl_seconds: int = Field(default=86400, gt=0)
+    # 空闲超时：超过这么久没有问答，本次会话即结束（人工状态一并关掉）。
+    # 判定发生在"用户回来那一刻"，不起后台定时器。
+    chat_inactivity_timeout_s: int = Field(default=300, gt=0)
     chat_backfill_max_messages: int = Field(default=200, ge=1)
     frontend_static_dir: str = "app/static"
     # 演示账号：不做账号体系，人工端固定身份
@@ -97,7 +102,7 @@ class Settings(BaseSettings):
     demo_stub_responses_raw: str = Field(
         default="""{
   "我要退款": {"intent": "refund", "mode": "execute"},
-  "我要投诉": {"intent": "complaint", "mode": "execute"},
+  "我要投诉": {"intent": "unknown", "mode": "execute"},
   "转人工": {"intent": "manual", "mode": "execute"},
   "我的订单到哪了": {"intent": "logistics", "mode": "execute"},
   "快递到哪了": {"intent": "logistics", "mode": "execute"},

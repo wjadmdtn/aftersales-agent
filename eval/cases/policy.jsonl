@@ -32,4 +32,4 @@
 {"id":"neg-logistics","category":"not_policy","path":"business_action","input":"我的快递到哪了","context":{"order_id":"ORD1002"},"expect":{"intent":"logistics"},"notes":"业务/澄清意图，不应路由到政策检索"}
 {"id":"neg-address","category":"not_policy","path":"business_action","input":"帮我改一下地址","context":{"order_id":"ORD1002"},"expect":{"intent":"change_address"},"notes":"业务/澄清意图，不应路由到政策检索"}
 {"id":"neg-order","category":"not_policy","path":"business_action","input":"查一下我的订单","context":{"order_id":"ORD1002"},"expect":{"intent":"query_order"},"notes":"业务/澄清意图，不应路由到政策检索"}
-{"id":"neg-vague","category":"not_policy","path":"business_action","input":"这个东西不好用","context":{"order_id":"ORD1002"},"expect":{"intent":"general"},"notes":"业务/澄清意图，不应路由到政策检索"}
+{"id":"neg-vague","category":"not_policy","path":"business_action","input":"这个东西不好用","context":{"order_id":"ORD1002"},"expect":{"intent":"unknown"},"notes":"业务/澄清意图，不应路由到政策检索"}

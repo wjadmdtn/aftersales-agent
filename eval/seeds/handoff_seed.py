@@ -1,7 +1,10 @@
-"""转人工类用例 30 条：四类触发源。
+"""转人工类用例：三类触发源 + 一组"不该转"的反例。
 
-判定顺序：用户主动要求 > 风险 > 系统异常 > 边界外。
-"我要投诉，转人工"按 user_request 处理——用户要的是人，不是 AI 道歉。
+判定顺序：用户主动要求 > 系统异常 > 边界外。
+
+2026-11-13 口径：投诉、差评、扬言监管**不再自动转人工**。
+转人工只由用户主动触发（manual）+ 系统异常 + 能力边界三处发生。
+原来 12 条 risk 用例转为 NOT_HANDOFF 反例组：必须安抚、不得入队。
 """
 from __future__ import annotations
 
@@ -20,9 +23,10 @@ USER_REQUEST = [
     "换个人跟我说",
 ]
 
-# ---------- 风险触发 12 条，优先级 high ----------
+# ---------- 不该转人工 12 条：投诉/差评/施压，一律 AI 安抚 ----------
+# 断言 triggered=False：既不能入队，也不得提示"转人工"。
 
-RISK = [
+NOT_HANDOFF = [
     "我要投诉你们",
     "你们这是欺诈",
     "我要去消协投诉",
@@ -69,8 +73,10 @@ def build() -> list:
             handoff(f"handoff-req-{i:02d}", text=text, trigger_type="user_request", priority="medium")
         )
 
-    for i, text in enumerate(RISK):
-        cases.append(handoff(f"handoff-risk-{i:02d}", text=text, trigger_type="risk", priority="high"))
+    for i, text in enumerate(NOT_HANDOFF):
+        c = handoff(f"handoff-noh-{i:02d}", text=text, trigger_type="user_request", priority="medium")
+        c.expect = {"triggered": False}
+        cases.append(c)
 
     for i, (text, streak) in enumerate(SYSTEM_ERROR):
         c = handoff(f"handoff-sys-{i:02d}", text=text, trigger_type="system_error", priority="low")
@@ -88,6 +94,6 @@ def build() -> list:
 if __name__ == "__main__":
     cs = build()
     print(
-        f"{len(cs)} 条：主动要求 {len(USER_REQUEST)} / 风险 {len(RISK)}"
+        f"{len(cs)} 条：主动要求 {len(USER_REQUEST)} / 不该转 {len(NOT_HANDOFF)}"
         f" / 系统异常 {len(SYSTEM_ERROR)} / 边界外 {len(BOUNDARY)}"
     )

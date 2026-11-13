@@ -6,13 +6,15 @@ import MessageStream from '@/components/MessageStream.vue'
 import { Socket } from '@/ws/socket'
 import { mergeMessages } from '@/ws/merge'
 import { api } from '@/api/rest'
-import type { ChatMessage, Envelope, QueueItem, UiState } from '@/types'
+import type { ChatMessage, Envelope, MySession, QueueItem, UiState } from '@/types'
 
 const agentId = ref(localStorage.getItem('aftersales.agent_id') ?? 'demo-agent')
 const agentName = ref(localStorage.getItem('aftersales.agent_name') ?? '小王')
 
 const queue = ref<QueueItem[]>([])
-const mySessions = ref<string[]>([])
+const mySessions = ref<MySession[]>([])
+// 快速判断"是不是我接的"：从数组派生，避免两处状态不一致
+const mySessionIds = computed(() => new Set(mySessions.value.map((s) => s.session_id)))
 const activeId = ref<string | null>(null)
 const messagesBySession = ref<Record<string, ChatMessage[]>>({})
 const statesBySession = ref<Record<string, { ui_state: UiState; agent_name?: string | null }>>({})
@@ -24,7 +26,7 @@ let socket: Socket | null = null
 const activeItem = computed(() => queue.value.find((i) => i.session_id === activeId.value) ?? null)
 const activeMessages = computed(() => messagesBySession.value[activeId.value ?? ''] ?? [])
 const activeIsMine = computed(
-  () => activeId.value !== null && mySessions.value.includes(activeId.value),
+  () => activeId.value !== null && mySessionIds.value.has(activeId.value),
 )
 
 async function loadQueue() {
@@ -35,7 +37,7 @@ async function loadQueue() {
 
 async function loadMine() {
   const r = await api.listSessions(agentId.value)
-  mySessions.value = r.items.map((i) => i.session_id)
+  mySessions.value = r.items
 }
 
 function handleFrame(env: Envelope<any>) {
@@ -49,8 +51,10 @@ function handleFrame(env: Envelope<any>) {
       ui_state: env.payload.ui_state,
       agent_name: env.payload.agent_name,
     }
-    if (env.payload.agent_id === agentId.value && !mySessions.value.includes(sid)) {
-      mySessions.value = [...mySessions.value, sid]
+    // 有新会话归到我名下（人工接入）或状态变了：重拉列表，
+    // 保证"我的会话"里的状态文字（服务中/已结束）是准的
+    if (env.payload.agent_id === agentId.value && !mySessionIds.value.has(sid)) {
+      void loadMine()
     }
     return
   }
@@ -141,7 +145,7 @@ onBeforeUnmount(() => socket?.close())
 
 <template>
   <div class="console">
-    <QueueSidebar :items="queue" :active-id="activeId" @select="open" />
+    <QueueSidebar :items="queue" :mine="mySessions" :active-id="activeId" @select="open" />
 
     <main>
       <p v-if="!activeId" class="placeholder">从左侧选择会话</p>

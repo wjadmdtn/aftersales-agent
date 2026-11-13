@@ -1,4 +1,4 @@
-import type { BizResult, ChatState, ChatMessage, OrderData, QueueItem } from '@/types'
+import type { BizResult, ChatState, ChatMessage, MySession, OrderData, QueueItem } from '@/types'
 
 async function getJson<T>(url: string): Promise<T> {
   const r = await fetch(url)
@@ -19,6 +19,8 @@ export interface SessionSnapshot {
   messages: ChatMessage[]
   last_seq: number
   truncated: boolean
+  /** 超过 5 分钟没有问答：本次会话已结束，历史照常给但应重开 */
+  expired?: boolean
 }
 
 export const api = {
@@ -30,7 +32,7 @@ export const api = {
   getSession: (sessionId: string, afterSeq = 0) =>
     getJson<SessionSnapshot>(`/chat/session/${sessionId}?after_seq=${afterSeq}`),
   listSessions: (agentId: string) =>
-    getJson<{ items: { session_id: string; state: string; agent_id: string | null }[] }>(
+    getJson<{ items: MySession[] }>(
       `/chat/sessions?agent_id=${encodeURIComponent(agentId)}`,
     ),
   getQueue: () => getJson<{ items: QueueItem[]; depth: number }>('/handoff/queue'),

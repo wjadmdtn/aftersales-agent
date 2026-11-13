@@ -76,21 +76,23 @@ async def test_manual_handoff_intent(chat):
 
 
 async def test_complaint_does_not_trigger_action(chat, env):
-    """投诉走人工，且不得因此动钱。"""
+    """投诉不转人工、不调工具、不动钱（2026-11-13 口径：只由用户主动要人工才转）。"""
     r = await chat("我要投诉", order="ORD1002")
-    assert r["intent"] == Intent.COMPLAINT
+    assert r["intent"] == Intent.UNKNOWN
     assert r["tool_calls"] == []
-    assert r["state"] == "handoff_queued"
+    assert r["state"] == "clarifying"
+    assert "抱歉" in r["reply"]
 
     order = (await env["mock_client"].get("/orders/ORD1002")).json()
     assert order["data"]["status"] == "PAID"
 
 
 async def test_unknown_input_asks_clarification(chat):
-    """识别不到工具时先澄清，不直接转人工。"""
+    """识别不到工具时先引导/澄清，不直接转人工。"""
     r = await chat("随便说点什么")
     assert r["state"] == "clarifying"
     assert "具体情况" in r["reply"]
+    assert "抱歉" not in r["reply"], "无关输入不道歉"
 
 
 async def test_negative_input_gets_apology(chat):
@@ -108,21 +110,26 @@ async def test_clarify_never_promises_business_action(chat):
         assert w not in r["reply"], f"澄清话术出现业务承诺「{w}」：{r['reply']}"
 
 
-async def test_second_clarify_offers_handoff(chat):
-    """第 2 轮征求转人工，不再列业务选项。"""
+async def test_second_clarify_keeps_asking_not_handoff(chat):
+    """第 2 轮继续追问，**不再征求转人工**（口径 2026-11-12）。
+
+    抱怨类不该被推向人工：只有明确投诉 / 要人工 / 差评才转。
+    """
     await chat("这个东西不好用")
     r = await chat("嗯……")
     assert r["state"] == "clarifying"
-    assert "人工" in r["reply"]
+    assert "人工" not in r["reply"], f"第 2 轮不该提示转人工：{r['reply']}"
     assert "1. 查询订单" not in r["reply"]
 
 
-async def test_clarify_then_handoff_after_limit(env, chat):
-    """澄清 2 轮后仍无法确定诉求，才转人工。"""
+async def test_many_clarify_rounds_never_auto_handoff(env, chat):
+    """澄清多少轮都不自动转人工——抱怨不是转人工的条件。"""
     await chat("随便说点什么")
     await chat("还是不懂")
     r = await chat("嗯")
-    assert r["state"] == "handoff_queued", "第 3 轮应转人工"
+    assert r["state"] == "clarifying", "抱怨/说不清不该被自动转人工"
+    r2 = await chat("真的不知道")
+    assert r2["state"] == "clarifying"
 
 
 async def test_manual_request_skips_clarification(chat):

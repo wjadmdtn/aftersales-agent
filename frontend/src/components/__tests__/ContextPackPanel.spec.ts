@@ -15,7 +15,7 @@ const item = (over: Partial<QueueItem> = {}): QueueItem => ({
     { tool: 'logistics.get', result_status: 'OK', at: '2026-11-10T08:00:01Z' },
   ],
   suggested_next_step: null,
-  primary_intent: 'complaint',
+  primary_intent: 'unknown',
   sentiment: 'angry',
   order_id: 'ORD1002',
   queued_at: '2026-11-10T08:00:00Z',

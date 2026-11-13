@@ -16,9 +16,9 @@
 {"id":"e2e-clarify-01","category":"e2e","path":"e2e","turns":["嗯"],"context":{"order_id":"ORD1002"},"expect":{"order_status":"PAID"}}
 {"id":"e2e-handoff-00","category":"e2e","path":"e2e","turns":["转人工"],"context":{"order_id":"ORD1002"},"expect":{"order_status":"PAID"},"notes":"转人工不改状态"}
 {"id":"e2e-handoff-01","category":"e2e","path":"e2e","turns":["我要投诉你们"],"context":{"order_id":"ORD1002"},"expect":{"order_status":"PAID"},"notes":"投诉不改状态"}
-{"id":"e2e-mix-00","category":"e2e","path":"e2e","turns":["快递到哪了","那退了吧"],"context":{"order_id":"ORD1002"},"expect":{"order_status":"REFUNDED","refund_count":1},"notes":"先查后决策"}
+{"id":"e2e-mix-00","category":"e2e","path":"e2e","turns":["快递到哪了","那退了吧","确认"],"context":{"order_id":"ORD1002"},"expect":{"order_status":"REFUNDED","refund_count":1},"notes":"先查后决策（写操作必须二次确认）"}
 {"id":"e2e-mix-01","category":"e2e","path":"e2e","turns":["我要退款","算了，直接改地址吧"],"context":{"order_id":"ORD1002"},"expect":{"order_status":"PAID","refund_count":0},"notes":"中途改主意"}
-{"id":"e2e-limit-00","category":"e2e","path":"e2e","turns":["随便说说","还是不懂","嗯"],"context":{"order_id":"ORD1002"},"expect":{"order_status":"PAID"},"notes":"三轮后转人工"}
+{"id":"e2e-limit-00","category":"e2e","path":"e2e","turns":["随便说说","还是不懂","嗯"],"context":{"order_id":"ORD1002"},"expect":{"order_status":"PAID"},"notes":"多轮安抚不转人工"}
 {"id":"e2e-neg-00","category":"e2e","path":"e2e","turns":["东西坏了"],"context":{"order_id":"ORD1002"},"expect":{"order_status":"PAID"},"notes":"负面情绪澄清"}
 {"id":"e2e-neg-01","category":"e2e","path":"e2e","turns":["质量太差了","我要退款","确认"],"context":{"order_id":"ORD1002"},"expect":{"order_status":"REFUNDED","refund_count":1},"notes":"情绪→诉求→执行"}
 {"id":"e2e-req-00","category":"e2e","path":"e2e","turns":["我要人工","算了还是查订单吧"],"context":{"order_id":"ORD1002"},"expect":{"order_status":"PAID"},"notes":"转人工请求可撤回"}

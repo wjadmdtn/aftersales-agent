@@ -13,9 +13,9 @@ async def test_returns_mapped_response():
 
 
 async def test_default_when_unmapped():
-    stub = StubLLMClient(default=IntentResult(intent=Intent.GENERAL, confidence=0.3))
+    stub = StubLLMClient(default=IntentResult(intent=Intent.UNKNOWN, confidence=0.3))
     r = await stub.classify(user_input="随便说点什么", hint_keywords=[], context={})
-    assert r.intent is Intent.GENERAL
+    assert r.intent is Intent.UNKNOWN
 
 
 async def test_fail_mode_timeout():
