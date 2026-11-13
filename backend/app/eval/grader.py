@@ -120,11 +120,19 @@ def _grade_irrelevant(case: EvalCase, actual: dict[str, Any]) -> list[str]:
 
 
 def _grade_policy(case: EvalCase, actual: dict[str, Any]) -> list[str]:
-    """政策问答：意图必须是 policy；给了期望条款则要求命中。"""
+    """政策问答：意图必须是 policy；给了期望条款则要求命中。
+
+    期望 state=handoff_queued 的用例（知识库确实没有答案）要求转人工，
+    不得编造回答——这是规范 005 FR-011 的硬约束。
+    """
     failures: list[str] = []
 
     if actual.get("intent") != "policy":
         failures.append(f"intent：期望 policy，实际 {actual.get('intent')}")
+
+    want_state = case.expect.get("state")
+    if want_state and actual.get("state") != want_state:
+        failures.append(f"state：期望 {want_state}，实际 {actual.get('state')}")
 
     want = case.expect.get("cited_clause")
     if want:
