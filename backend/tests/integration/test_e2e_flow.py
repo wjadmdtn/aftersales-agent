@@ -54,10 +54,20 @@ async def test_containing_confirmation_word_is_rejected(chat, env):
 
 
 async def test_refund_on_non_refundable_order_shows_reason(chat, env):
-    await chat("我要退款", order="ORD1007")
-    r = await chat("确认")
-    assert r["state"] == "executed"
-    assert "已完成" in r["reply"] or "退款" in r["reply"]
+    """已退款订单不得再走确认流程。
+
+    旧行为：弹卡片 → 用户确认 → 调退款接口才被服务端拒，用户白点一次。
+    新行为：第一步就拒绝，不生成待确认操作。
+    """
+    r1 = await chat("我要退款", order="ORD1007")
+    assert r1["state"] == "write_rejected"
+    assert "退款完成" in r1["reply"]
+
+    r2 = await chat("确认", order="ORD1007")
+    assert r2["state"] != "executed"
+
+    order = (await env["mock_client"].get("/orders/ORD1007")).json()
+    assert order["data"]["status"] == "REFUNDED"
 
 
 async def test_logistics_read_flow(chat):
@@ -65,6 +75,27 @@ async def test_logistics_read_flow(chat):
     assert r["intent"] == Intent.LOGISTICS
     assert "logistics.get" in r["tool_calls"]
     assert "南京" in r["reply"]
+
+
+async def test_exchange_gives_self_service_path(chat, env):
+    """换货不由 AI 办理：告知条件 + 自助入口，不弹确认、不调工具、不改订单。"""
+    r = await chat("我想换个货", order="ORD1002")
+    assert r["intent"] == Intent.EXCHANGE
+    assert r["tool_calls"] == []
+    # ORD1002 未发货：不该说"可以换"，应告知还没到换货环节
+    assert r["state"] == "exchange_not_applicable"
+    assert "还没发货" in r["reply"] or "运输中" in r["reply"]
+
+    order = (await env["mock_client"].get("/orders/ORD1002")).json()
+    assert order["data"]["status"] == "PAID"
+
+
+async def test_exchange_delivered_within_window(chat, env):
+    """已签收且在 7 天内：给出换货条件与自助入口。"""
+    r = await chat("我想换个尺码", order="ORD1004")
+    assert r["intent"] == Intent.EXCHANGE
+    assert r["state"] in ("exchange_available", "exchange_expired")
+    assert "我的订单" in r["reply"] or "超过 7 天" in r["reply"]
 
 
 async def test_manual_handoff_intent(chat):

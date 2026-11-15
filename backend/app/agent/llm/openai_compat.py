@@ -54,7 +54,13 @@ def _parse_search_query(value) -> str | None:
 _SYSTEM_PROMPT = """你是客服意图识别器。判断用户**真实诉求**，只输出 JSON。
 
 意图只能是：refund(发起退款) / logistics(查物流) / change_address(改地址) /
-query_order(查订单) / manual(要人工) / policy(政策咨询) / unknown(诉求不明)
+query_order(查订单) / exchange(换货) / manual(要人工) / policy(政策咨询) / unknown(诉求不明)
+
+**exchange 的含义**：用户想换货——换个型号、换个尺码、换个颜色、换一件。
+例："我想换个货""能换个尺码吗""这个能换吗（指换货）"。
+系统不直接办理换货，识别出来后会按订单状态告知换货条件与自助申请入口。
+注意与 change_address（改收货地址）区分：换货是换商品，改地址是换收货地点。
+与 refund 区分：换货不是退款，用户没说要退钱。
 
 **unknown 的含义**：用户没有表达出可执行的具体诉求。包括：抱怨、发泄情绪、
 闲聊、转述他人、否定表达、历史陈述、以及任何你无法归类的输入。

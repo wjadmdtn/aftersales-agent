@@ -10,18 +10,23 @@ from pydantic import BaseModel, Field
 
 
 class Intent(StrEnum):
-    """六个业务意图 + 一个兜底。
+    """六个业务意图 + exchange 固定拒答 + unknown 兜底。
 
     2026-11-13 口径：删除 complaint / general 两个语义桶。
     - 抱怨、不满、情绪化表达不再是独立意图，统一落 UNKNOWN，
       由 AI 安抚即可，不转人工、不做业务动作。
     - 转人工只由用户主动触发（manual）+ 系统异常/能力边界两条例外。
+
+    2026-11-15：加 EXCHANGE。系统不直接办理换货——按订单状态判断条件是否满足，
+    给出规则说明与「我的订单 → 申请售后 → 换货」自助入口。不调写工具、不改订单。
     """
 
     REFUND = "refund"
     LOGISTICS = "logistics"
     CHANGE_ADDRESS = "change_address"
     QUERY_ORDER = "query_order"
+    # 换货：不直接办理，按订单状态给条件说明与自助入口。
+    EXCHANGE = "exchange"
     MANUAL = "manual"
     POLICY = "policy"      # 政策咨询：规则是什么，不是"我这一单怎样"
     # 诉求不明（含抱怨、闲聊、无法归类）。行为 == 安抚/澄清，绝不调工具、绝不转人工。

@@ -26,9 +26,18 @@ def test_business_fail_shows_both_values():
 
 
 def test_clarify_pass():
-    c = _case(path=EvalPath.CLARIFY, expect={"state": "clarifying", "starts_with_apology": True})
-    r = grade(c, {"state": "clarifying", "reply": APOLOGY + "方便说下具体情况吗？"})
+    c = _case(path=EvalPath.CLARIFY, expect={"intent": "unknown", "state": "clarifying", "starts_with_apology": True})
+    r = grade(c, {"intent": "unknown", "state": "clarifying", "reply": APOLOGY + "方便说下具体情况吗？"})
     assert r.passed
+
+
+def test_clarify_fails_when_intent_misread():
+    """只断言 state=clarifying 不够：模型把"太差了"误判成 refund，
+    只要没弹确认、走了澄清，旧断言照样通过。必须比对意图。"""
+    c = _case(path=EvalPath.CLARIFY, expect={"intent": "unknown", "state": "clarifying"})
+    r = grade(c, {"intent": "refund", "state": "clarifying", "reply": APOLOGY})
+    assert not r.passed
+    assert any("intent" in f for f in r.failures)
 
 
 def test_clarify_promise_always_fails():
@@ -47,8 +56,8 @@ def test_clarify_apology_mismatch():
 
 
 def test_clarify_should_not_apologize():
-    c = _case(path=EvalPath.CLARIFY, expect={"state": "clarifying", "starts_with_apology": False})
-    r = grade(c, {"state": "clarifying", "reply": "方便说下具体情况吗？"})
+    c = _case(path=EvalPath.CLARIFY, expect={"intent": "unknown", "state": "clarifying", "starts_with_apology": False})
+    r = grade(c, {"intent": "unknown", "state": "clarifying", "reply": "方便说下具体情况吗？"})
     assert r.passed
 
 
@@ -72,9 +81,9 @@ def test_handoff_all_match():
 
 
 def test_irrelevant_no_apology():
-    c = _case(path=EvalPath.IRRELEVANT, input="今天天气不错", expect={"state": "clarifying", "starts_with_apology": False})
-    assert grade(c, {"state": "clarifying", "reply": "方便说下具体情况吗？"}).passed
-    r = grade(c, {"state": "clarifying", "reply": APOLOGY + "怎么了"})
+    c = _case(path=EvalPath.IRRELEVANT, input="今天天气不错", expect={"intent": "unknown", "state": "clarifying", "starts_with_apology": False})
+    assert grade(c, {"intent": "unknown", "state": "clarifying", "reply": "方便说下具体情况吗？"}).passed
+    r = grade(c, {"intent": "unknown", "state": "clarifying", "reply": APOLOGY + "怎么了"})
     assert not r.passed
 
 

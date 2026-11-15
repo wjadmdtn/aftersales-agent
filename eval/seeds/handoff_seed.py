@@ -75,7 +75,8 @@ def build() -> list:
 
     for i, text in enumerate(NOT_HANDOFF):
         c = handoff(f"handoff-noh-{i:02d}", text=text, trigger_type="user_request", priority="medium")
-        c.expect = {"triggered": False}
+        # 投诉/差评/施压：意图判 unknown 并由 AI 安抚，不进人工队列。
+        c.expect = {"triggered": False, "intent": "unknown"}
         cases.append(c)
 
     for i, (text, streak) in enumerate(SYSTEM_ERROR):

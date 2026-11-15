@@ -18,7 +18,7 @@ import logging
 import re
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 
@@ -200,6 +200,11 @@ class AgentLoop:
                     state="need_order",
                 )
             return await self._handle_write(state, intent, message, trace_id=trace_id)
+
+        if intent is Intent.EXCHANGE:
+            # 换货不由 AI 办理：按订单状态给出条件判断 + 自助入口指引。
+            # 不弹确认、不调工具、不改订单——换货申请由用户在订单页自己提交。
+            return await self._handle_exchange(state, trace_id=trace_id)
 
         if intent is Intent.MANUAL:
             return await self._handoff(
@@ -399,6 +404,75 @@ class AgentLoop:
             state="handoff_queued",
         )
 
+    async def _handle_exchange(self, state: SessionState, *, trace_id: str) -> AgentReply:
+        """换货指引：判断条件是否满足，告诉用户去哪自助申请。不调任何写工具。
+
+        依据 AFTERSALE-EXCHANGE-01：
+        - 普通换货：签收次日起 7 日内，仅限同款不同规格
+        - 未签收（未发货/已发货未签收）→ 还没到换货环节
+        - 已签收超 7 日 → 不再受理无理由换货
+        """
+        if not state.order_id:
+            return AgentReply(
+                reply="请问是哪一笔订单呢？我帮您确认一下换货条件。",
+                intent=Intent.EXCHANGE,
+                state="need_order",
+            )
+
+        body = await self.tools.get_order(state.order_id, trace_id=trace_id)
+        if body.get("code") != ResultCode.OK:
+            return AgentReply(reply=present.render(body), intent=Intent.EXCHANGE, state="exchange_failed")
+
+        order = body.get("data") or {}
+        status = order.get("status")
+
+        if status in ("PENDING_PAYMENT", "PAID"):
+            reply = (
+                f"这笔订单还没发货，暂时不需要换货哦。"
+                f"如果商品信息不对，可以取消订单重新下单。"
+            )
+            return AgentReply(reply=reply, intent=Intent.EXCHANGE, state="exchange_not_applicable")
+
+        if status == "SHIPPED":
+            return AgentReply(
+                reply="这笔订单还在运输中，签收后 7 日内可以申请换货。收到货后如有需要，"
+                      "可以在「我的订单 → 申请售后 → 换货」里提交。",
+                intent=Intent.EXCHANGE,
+                state="exchange_not_applicable",
+            )
+
+        if status in ("REFUNDED", "REFUNDING"):
+            return AgentReply(
+                reply="这笔订单已经在退款流程中，无法再申请换货。",
+                intent=Intent.EXCHANGE,
+                state="exchange_not_applicable",
+            )
+
+        # 已签收：算是否在 7 天内。签收时间在物流轨迹里，订单接口不带，
+        # 必须单独查一次物流——拿不到就按"期限内"处理，不因为查不到就拒绝用户。
+        days_left = None
+        try:
+            lg = await self.tools.get_logistics(state.order_id, trace_id=trace_id)
+            days_left = _exchange_days_left(lg.get("data") or {})
+        except Exception:  # noqa: BLE001 - 物流查不到不影响给指引
+            logger.warning("exchange: logistics lookup failed order=%s", state.order_id)
+        if days_left is not None and days_left < 0:
+            return AgentReply(
+                reply="抱歉，这笔订单签收已超过 7 天，不再支持无理由换货。"
+                      "如果是质量问题，您可以提供照片，我帮您转人工核实。",
+                intent=Intent.EXCHANGE,
+                state="exchange_expired",
+            )
+
+        when = f"还剩 {days_left} 天" if days_left is not None else "在签收次日起 7 日内"
+        return AgentReply(
+            reply=f"这笔订单{when}可以申请换货，仅限同款不同规格（如尺码、颜色）。"
+                  f"您可以在「我的订单 → 申请售后 → 换货」里自助提交，"
+                  f"我这边也可以帮您转人工处理。",
+            intent=Intent.EXCHANGE,
+            state="exchange_available",
+        )
+
     async def _handle_inquiry(
         self, state: SessionState, intent: Intent, *, trace_id: str
     ) -> AgentReply:
@@ -487,16 +561,39 @@ class AgentLoop:
         if not state.order_id:
             return AgentReply(reply="请问是哪一笔订单呢？麻烦提供一下订单号。", state="need_order")
 
-        # 用户未说金额时按订单全额退款。金额取自库，不用前端快照。
-        if intent is Intent.REFUND:
-            body = await self.tools.get_order(state.order_id, trace_id=trace_id)
-            if body.get("code") != ResultCode.OK:
-                return AgentReply(reply=present.render(body), state="execute_failed")
-            order = body.get("data") or {}
+        # 写操作在弹确认前就要查订单：不能改的订单不该走到"确认"这一步，
+        # 否则用户点了确认才发现不行，是拿无效确认骗用户。
+        body = await self.tools.get_order(state.order_id, trace_id=trace_id)
+        if body.get("code") != ResultCode.OK:
+            return AgentReply(reply=present.render(body), state="execute_failed")
+        order = body.get("data") or {}
+        status = order.get("status")
+
+        if intent is Intent.CHANGE_ADDRESS:
+            # 只有未发货（待支付 / 已支付）的订单可以改地址。
+            if status not in ("PENDING_PAYMENT", "PAID"):
+                return AgentReply(
+                    reply="订单已经发货了，收货地址无法修改。",
+                    intent=intent,
+                    state="write_rejected",
+                )
+            amount = None
+        else:
+            # 用户未说金额时按订单全额退款。金额取自库，不用前端快照。
+            if status == "REFUNDED":
+                return AgentReply(
+                    reply="这笔订单已经退款完成了，不需要重复申请哦。",
+                    intent=intent,
+                    state="write_rejected",
+                )
+            if status == "REFUNDING":
+                return AgentReply(
+                    reply="这笔订单正在退款处理中，请留意到账通知。",
+                    intent=intent,
+                    state="write_rejected",
+                )
             matched = AMOUNT_PATTERN.search(message)
             amount = Decimal(matched.group(1)) if matched else Decimal(str(order.get("amount", "0")))
-        else:
-            amount = None
 
         pending = build_confirmation(
             intent=intent,
@@ -529,6 +626,18 @@ class AgentLoop:
             check = await self.tools.get_order(pending.order_id, trace_id=trace_id)
             if check.get("code") != ResultCode.OK:
                 return AgentReply(reply=present.render(check), state="execute_failed")
+            status = (check.get("data") or {}).get("status")
+            # 从弹卡片到点确认之间订单可能已被退过，重复退款必须挡住
+            if status in ("REFUNDED", "REFUNDING"):
+                return AgentReply(
+                    reply="这笔订单已经退款完成或正在退款中，无需重复申请。",
+                    state="write_rejected",
+                )
+            if status in ("PENDING_PAYMENT", "CLOSED"):
+                return AgentReply(
+                    reply="这笔订单当前状态不支持退款。",
+                    state="write_rejected",
+                )
 
             req_id = f"refund:{pending.order_id}:{uuid.uuid4().hex}"
             body = await self.tools.create_refund(
@@ -543,6 +652,16 @@ class AgentLoop:
                 state="executed",
             )
 
+        # 改地址同样要在执行前复核：弹确认到用户点确认之间可能已经发货
+        check = await self.tools.get_order(pending.order_id, trace_id=trace_id)
+        if check.get("code") != ResultCode.OK:
+            return AgentReply(reply=present.render(check), state="execute_failed")
+        if (check.get("data") or {}).get("status") not in ("PENDING_PAYMENT", "PAID"):
+            return AgentReply(
+                reply="这笔订单刚刚已经发货了，收货地址无法修改。",
+                state="write_rejected",
+            )
+
         body = await self.tools.update_address(
             pending.order_id,
             pending.payload.get("address", {}),
@@ -550,9 +669,35 @@ class AgentLoop:
         )
         return AgentReply(
             reply=present.render(body),
-            tool_calls=["address.update"],
+            tool_calls=["order.get", "address.update"],
             state="executed",
         )
+
+
+EXCHANGE_WINDOW_DAYS = 7
+
+
+def _exchange_days_left(order: dict) -> int | None:
+    """按签收日算换货剩余天数。签收次日计第 1 天。
+
+    找不到签收时间返回 None（按"在期限内"处理并提示用户自行确认）。
+    """
+    signed_at = _signed_at(order)
+    if signed_at is None:
+        return None
+    if signed_at.tzinfo is None:
+        signed_at = signed_at.replace(tzinfo=timezone.utc)
+    deadline = signed_at + timedelta(days=EXCHANGE_WINDOW_DAYS)
+    return (deadline - datetime.now(timezone.utc)).days
+
+
+def _signed_at(payload: dict) -> datetime | None:
+    """取签收时间。兼容两种结构：订单内的 logistics 子对象、物流接口的 data。"""
+    tracks = (payload.get("logistics") or {}).get("tracks") or payload.get("tracks") or []
+    for t in tracks:
+        if t.get("node") == "已签收":
+            return _parse_dt(t.get("at"))
+    return None
 
 
 def _parse_dt(value):

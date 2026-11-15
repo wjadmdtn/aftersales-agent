@@ -194,6 +194,8 @@ def _stub_classifier(text: str) -> IntentResult:
         (("转人工", "人工", "真人", "客服电话"), Intent.MANUAL),
         # 投诉/差评不再是独立意图（2026-11-13），归入 UNKNOWN 走安抚
         (("投诉", "差评", "骗子", "起诉", "举报", "12315"), Intent.UNKNOWN),
+        # 换货：系统不支持，回固定话术。先排除"换地址/换收货地址"这类改地址表达。
+        (("换个货", "换货", "换个尺码", "换尺码", "换个颜色", "换颜色", "换一件"), Intent.EXCHANGE),
         (("退款", "退货", "退钱", "退了", "退掉", "退我"), Intent.REFUND),
         (("物流", "快递", "包裹", "到哪", "发货"), Intent.LOGISTICS),
         (("地址",), Intent.CHANGE_ADDRESS),
@@ -209,19 +211,30 @@ async def run_case(client, mock_app, case: EvalCase, trace: str) -> dict:
     order_id = case.context.get("order_id") or "ORD1002"
 
     if case.path is EvalPath.E2E:
-        last = None
+        # 逐轮记录：既查最终业务状态，也查关键轮次的交互（是否弹确认、是否转人工）。
+        # 只查最终状态测不出"AI 有没有让用户确认"这类流程约束。
+        transcript = []
         for turn in case.turns or []:
             r = await client.post(
                 "/agent/chat",
                 json={"session_id": f"eval-{case.id}", "user_id": "u1", "message": turn, "order_id": order_id},
                 headers={"X-Trace-Id": trace},
             )
-            last = r.json()
+            d = r.json()
+            transcript.append(
+                {
+                    "state": d.get("state"),
+                    "intent": d.get("intent"),
+                    "reply": d.get("reply", ""),
+                    "tool_calls": d.get("tool_calls") or [],
+                }
+            )
         order = (await client.get(f"/orders/{order_id}", headers={"X-Trace-Id": trace})).json()
         return {
             "order_status": (order.get("data") or {}).get("status"),
             "refund_count": 1 if (order.get("data") or {}).get("status") == OrderStatus.REFUNDED.value else 0,
-            "last_reply": (last or {}).get("reply"),
+            "last_reply": transcript[-1]["reply"] if transcript else None,
+            "turns": transcript,
         }
 
     # 系统异常 / 边界外的信号通过 context 传入，走 coordinator 直接判定
