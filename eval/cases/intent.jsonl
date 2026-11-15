@@ -71,9 +71,9 @@
 {"id":"intent-adv-15","category":"adversarial","path":"business_action","input":"先别退款，我改个地址","context":{"order_id":"ORD1002"},"expect":{"intent":"change_address","mode":"execute"}}
 {"id":"intent-adv-16","category":"adversarial","path":"business_action","input":"我退款的那个订单物流到哪了","context":{"order_id":"ORD1002"},"expect":{"intent":"logistics","mode":"query"}}
 {"id":"intent-adv-17","category":"adversarial","path":"business_action","input":"退款之后地址还能改吗","context":{"order_id":"ORD1002"},"expect":{"intent":"policy","mode":"inquiry"}}
-{"id":"intent-adv-18","category":"adversarial","path":"business_action","input":"退款记录在哪看","context":{"order_id":"ORD1002"},"expect":{"intent":"query_order","mode":"inquiry"}}
-{"id":"intent-adv-19","category":"adversarial","path":"business_action","input":"嗯……退款吧","context":{"order_id":"ORD1002"},"expect":{"intent":"refund","mode":"inquiry"}}
-{"id":"intent-adv-20","category":"adversarial","path":"business_action","input":"那个……我想问下退货的事","context":{"order_id":"ORD1002"},"expect":{"intent":"refund","mode":"execute"}}
+{"id":"intent-adv-18","category":"adversarial","path":"business_action","input":"退款记录在哪看","context":{"order_id":"ORD1002"},"expect":{"intent":"policy","mode":"inquiry"}}
+{"id":"intent-adv-19","category":"adversarial","path":"business_action","input":"嗯……退款吧","context":{"order_id":"ORD1002"},"expect":{"intent":"refund","mode":"execute"}}
+{"id":"intent-adv-20","category":"adversarial","path":"business_action","input":"那个……我想问下退货的事","context":{"order_id":"ORD1002"},"expect":{"intent":"policy","mode":"inquiry"}}
 {"id":"intent-adv-21","category":"adversarial","path":"business_action","input":"我不想退款，我只想换个货","context":{"order_id":"ORD1002"},"expect":{"intent":"exchange","mode":"execute"}}
 {"id":"intent-adv-22","category":"adversarial","path":"business_action","input":"不是要退款，是地址错了","context":{"order_id":"ORD1002"},"expect":{"intent":"change_address","mode":"execute"}}
 {"id":"intent-adv-23","category":"adversarial","path":"business_action","input":"能换个尺码吗","context":{"order_id":"ORD1002"},"expect":{"intent":"exchange","mode":"inquiry"}}
@@ -89,7 +89,7 @@
 {"id":"intent-nokw-01","category":"no_keyword","path":"business_action","input":"这个没法用","context":{"order_id":"ORD1002"},"expect":{"intent":"unknown","mode":"execute"}}
 {"id":"intent-nokw-02","category":"no_keyword","path":"business_action","input":"东西摔碎了","context":{"order_id":"ORD1002"},"expect":{"intent":"unknown","mode":"execute"}}
 {"id":"intent-nokw-03","category":"no_keyword","path":"business_action","input":"我想把它还给你们","context":{"order_id":"ORD1002"},"expect":{"intent":"refund","mode":"execute"}}
-{"id":"intent-nokw-04","category":"no_keyword","path":"business_action","input":"我的钱还能拿回来吗","context":{"order_id":"ORD1002"},"expect":{"intent":"refund","mode":"inquiry"}}
+{"id":"intent-nokw-04","category":"no_keyword","path":"business_action","input":"我的钱还能拿回来吗","context":{"order_id":"ORD1002"},"expect":{"intent":"refund","mode":"query"}}
 {"id":"intent-nokw-05","category":"no_keyword","path":"business_action","input":"东西在路上多久了","context":{"order_id":"ORD1002"},"expect":{"intent":"logistics","mode":"query"}}
 {"id":"intent-nokw-06","category":"no_keyword","path":"business_action","input":"怎么还没送来","context":{"order_id":"ORD1002"},"expect":{"intent":"logistics","mode":"query"}}
 {"id":"intent-nokw-07","category":"no_keyword","path":"business_action","input":"几号能收到","context":{"order_id":"ORD1002"},"expect":{"intent":"logistics","mode":"query"}}

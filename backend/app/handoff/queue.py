@@ -13,7 +13,6 @@ from app.models.handoff import (
     PRIORITY_SCORE,
     HandoffContext,
     Priority,
-    QueueItem,
 )
 
 QUEUE_KEY = "handoff:queue"

@@ -22,12 +22,16 @@ class FakeWs:
         self.sent: list[str] = []
         self.client_state = WebSocketState.CONNECTED
         self.closed = False
+        self.close_code: int | None = None
+        self.close_reason: str = ""
 
     async def send_text(self, text: str) -> None:
         self.sent.append(text)
 
-    async def close(self) -> None:
+    async def close(self, code: int = 1000, reason: str = "") -> None:
         self.closed = True
+        self.close_code = code
+        self.close_reason = reason
 
 
 def _conn(role, **kw) -> Connection:
@@ -114,15 +118,42 @@ async def test_close_all_clears_registry():
     assert a.ws.closed is True
 
 
+# ---------- 心跳 ----------
+
+
 async def test_heartbeat_sends_ping_periodically():
+    """后端主动发 ping，前端回 pong（socket.ts 处理 ping）。"""
     hub = Hub()
     a = _conn("user", user_id="u1", session_id="s1")
     hub.register(a)
-    task = asyncio.create_task(hub.heartbeat_loop(interval_s=0, idle_timeout_s=1))
+    hub.start_heartbeat(a, interval_s=0.01, idle_timeout_s=5)
     await asyncio.sleep(0.05)
-    task.cancel()
     await _flush()
     import json
 
-    frames = [json.loads(s) for s in a.ws.sent]
+    frames = [json.loads(x) for x in a.ws.sent]
     assert any(f["type"] == "ping" for f in frames)
+
+
+async def test_heartbeat_touch_pong_keeps_alive():
+    """收到 pong 刷新活跃时刻，连接不被断。"""
+    hub = Hub()
+    a = _conn("user", user_id="u1", session_id="s1")
+    hub.register(a)
+    hub.start_heartbeat(a, interval_s=0.01, idle_timeout_s=0.05)
+
+    for _ in range(6):
+        await asyncio.sleep(0.02)
+        hub.touch_pong(a)
+    assert a.ws.closed is False
+
+
+async def test_heartbeat_closes_idle_connection():
+    """长时间不响应 pong → 断开，close code 4408。"""
+    hub = Hub()
+    a = _conn("user", user_id="u1", session_id="s1")
+    hub.register(a)
+    hub.start_heartbeat(a, interval_s=0.01, idle_timeout_s=0.03)
+    await asyncio.sleep(0.15)
+    assert a.ws.closed is True
+    assert a.ws.close_code == 4408

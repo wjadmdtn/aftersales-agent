@@ -103,10 +103,10 @@ ADVERSARIAL = [
     # 含关键词但问的是别的
     (("我退款的那个订单物流到哪了"), "logistics"),
     (("退款之后地址还能改吗"), "policy", "inquiry"),  # 条款缺该场景，退化为政策咨询
-    (("退款记录在哪看"), "query_order", "inquiry"),  # 功能入口，非政策
+    (("退款记录在哪看"), "policy", "inquiry"),  # 功能入口咨询，非本单状态查询
     # 语气词干扰
-    (("嗯……退款吧"), "refund", "inquiry"),
-    (("那个……我想问下退货的事"), "refund"),
+    (("嗯……退款吧"), "refund", "execute"),  # "退款吧"是祈使，要执行
+    (("那个……我想问下退货的事"), "policy", "inquiry"),  # 问规则，不是发起退货
     # 否定
     (("我不想退款，我只想换个货"), "exchange", "execute"),
     (("不是要退款，是地址错了"), "change_address"),
@@ -130,7 +130,7 @@ NO_KEYWORD = [
     (("这个没法用"), "unknown"),
     (("东西摔碎了"), "unknown"),
     (("我想把它还给你们"), "refund"),
-    (("我的钱还能拿回来吗"), "refund", "inquiry"),
+    (("我的钱还能拿回来吗"), "refund", "query"),  # 问进度
     (("东西在路上多久了"), "logistics"),
     (("怎么还没送来"), "logistics"),
     (("几号能收到"), "logistics"),
@@ -139,7 +139,7 @@ NO_KEYWORD = [
     (("送错地方了"), "change_address"),
     (("寄到别的地方去"), "change_address", "need_context"),
     (("我把地址说错了"), "change_address"),
-    (("付了钱没看到东西"), "logistics"),
+    (("付了钱没看到东西"), "logistics", "query"),  # 没收到货，查物流
     (("这单算多少钱"), "query_order"),
     (("我什么时候买的"), "query_order"),
     # 「在哪」是查找，不是执行 → inquiry

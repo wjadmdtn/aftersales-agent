@@ -115,6 +115,3 @@ def apply_comparison(report: EvalReport, baseline: dict[str, float]) -> EvalRepo
     report.block_reasons = reasons
     return report
 
-
-def metric_by_name(report: EvalReport, name: str) -> MetricLine | None:
-    return next((m for m in report.metrics if m.name == name), None)

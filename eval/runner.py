@@ -313,6 +313,12 @@ async def run_case(client, mock_app, case: EvalCase, trace: str) -> dict:
 
 async def main_async(args) -> int:
     cases = load_dir(CASES_DIR)
+    if args.only:
+        wanted = {x.strip() for x in args.only.split(",") if x.strip()}
+        cases = [c for c in cases if c.path.value in wanted]
+        if not cases:
+            print(f"没有匹配的用例路径：{args.only}")
+            return 1
     client, mock_app, redis, llm, store = await build_env(args.llm, args.model, args.embedder)
 
     results = []
@@ -374,6 +380,11 @@ def main() -> int:
         choices=["stub", "bge"],
         default="stub",
         help="bge 才真正测检索质量；stub 只验证接线，政策用例数字不可对外引用",
+    )
+    p.add_argument(
+        "--only",
+        default=None,
+        help="只跑指定路径，逗号分隔：e2e,policy,clarify,handoff,irrelevant,business_action",
     )
     p.add_argument("--update-baseline", action="store_true")
     p.add_argument("--no-baseline", action="store_true")

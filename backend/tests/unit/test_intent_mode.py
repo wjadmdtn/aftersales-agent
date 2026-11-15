@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.agent.intent_mode import normalize_mode, requires_order_context
+from app.agent.intent_mode import normalize_mode
 from app.models.agent import Intent, IntentMode
 
 
@@ -45,10 +45,3 @@ def test_various_question_markers(text):
 def test_various_imperatives(text):
     mode, _ = normalize_mode(Intent.REFUND, IntentMode.INQUIRY, text)
     assert mode is IntentMode.EXECUTE
-
-
-def test_requires_order_context():
-    assert requires_order_context(Intent.REFUND, IntentMode.EXECUTE, has_order=False)
-    assert not requires_order_context(Intent.REFUND, IntentMode.EXECUTE, has_order=True)
-    assert not requires_order_context(Intent.REFUND, IntentMode.INQUIRY, has_order=False)
-    assert not requires_order_context(Intent.LOGISTICS, IntentMode.EXECUTE, has_order=False)

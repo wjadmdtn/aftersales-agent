@@ -34,10 +34,6 @@ class Settings(BaseSettings):
 
     # 关键词仅作为提示传给 LLM，不参与意图判定
     keyword_hints_raw: str = Field(default='{}')
-    # 降级期使用的宽写词表：比正常词表更宽，宁可误拒只读
-    degrade_write_keywords_raw: str = Field(
-        default='["退","退款","退货","退钱","退换","申请退","改","改地址","修改","换地址","更换","取消","撤销"]'
-    )
     # 确认词必须精确匹配，不能包含匹配
     confirm_words_raw: str = Field(
         default='["确认","确定","是的","对","好的","可以","同意"]'
@@ -164,7 +160,7 @@ class Settings(BaseSettings):
     def handoff_scripts(self) -> dict[str, str]:
         return json.loads(self.handoff_scripts_raw)
 
-    @field_validator("keyword_hints_raw", "degrade_write_keywords_raw", "confirm_words_raw")
+    @field_validator("keyword_hints_raw", "confirm_words_raw")
     @classmethod
     def _validate_json(cls, v: str) -> str:
         json.loads(v)
@@ -173,10 +169,6 @@ class Settings(BaseSettings):
     @property
     def keyword_hints(self) -> dict[str, list[str]]:
         return json.loads(self.keyword_hints_raw)
-
-    @property
-    def degrade_write_keywords(self) -> tuple[str, ...]:
-        return tuple(json.loads(self.degrade_write_keywords_raw))
 
     @property
     def confirm_words(self) -> frozenset[str]:

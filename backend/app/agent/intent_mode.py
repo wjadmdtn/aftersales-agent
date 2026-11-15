@@ -35,10 +35,3 @@ def normalize_mode(intent: Intent, mode: IntentMode, text: str) -> tuple[IntentM
         return IntentMode.EXECUTE, "含明确祈使词，判定为执行"
 
     return mode, None
-
-
-def requires_order_context(intent: Intent, mode: IntentMode, has_order: bool) -> bool:
-    """意图明确但要动业务，却缺少订单上下文。"""
-    if mode is IntentMode.EXECUTE and intent in WRITE_INTENTS and not has_order:
-        return True
-    return False

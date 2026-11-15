@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -33,6 +34,8 @@ class Connection:
     session_id: str | None = None  # 用户端固定；人工端为 None（关心多会话）
     queue: asyncio.Queue[Envelope] = field(default_factory=asyncio.Queue)
     _closed: bool = False
+    # 最近一次收到 pong 的时刻（monotonic 秒）。心跳协程据此判断半开连接。
+    last_pong_at: float = field(default_factory=time.monotonic)
 
     def matches_session(self, session_id: str | None) -> bool:
         if self.role == "agent":
@@ -70,6 +73,45 @@ class Hub:
             return
         except Exception:
             logger.exception("ws sender crashed role=%s", conn.role)
+
+    def start_heartbeat(self, conn: Connection, *, interval_s: float, idle_timeout_s: float) -> None:
+        """每个连接一个心跳协程：定期发 ping，超时未收到 pong 则断开。
+
+        为什么后端主动发：只靠 TCP 无法发现半开连接（客户端断电、网络中断但
+        没有 FIN）。前端负责回 pong（socket.ts 里处理 ping），后端据此判断
+        连接是否还活着，超过 idle_timeout_s 就关掉，释放资源。
+        """
+        task = asyncio.create_task(
+            self._heartbeat(conn, interval_s=interval_s, idle_timeout_s=idle_timeout_s)
+        )
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+
+    async def _heartbeat(self, conn: Connection, *, interval_s: float, idle_timeout_s: float) -> None:
+        try:
+            while True:
+                await asyncio.sleep(interval_s)
+                if conn._closed:
+                    return
+                idle = time.monotonic() - conn.last_pong_at
+                if idle > idle_timeout_s:
+                    logger.info(
+                        "ws idle timeout role=%s session=%s idle=%.1fs",
+                        conn.role, conn.session_id, idle,
+                    )
+                    conn._closed = True
+                    try:
+                        await conn.ws.close(code=CLOSE_IDLE_TIMEOUT, reason="idle timeout")
+                    except Exception:  # noqa: BLE001 - 连接可能已断，关闭失败不影响清理
+                        pass
+                    return
+                conn.send(envelope(MessageType.PING, session_id=conn.session_id, payload={}))
+        except asyncio.CancelledError:
+            return
+
+    def touch_pong(self, conn: Connection) -> None:
+        """收到 pong：记录活跃时刻，推迟超时。"""
+        conn.last_pong_at = time.monotonic()
 
     async def publish(
         self,
@@ -113,16 +155,6 @@ class Hub:
             envelope(MessageType.QUEUE_UPDATE, session_id=None, payload=payload),
             to_agents=True,
         )
-
-    async def heartbeat_loop(self, interval_s: int, idle_timeout_s: int) -> None:
-        """周期发 ping；调用方的 receive 循环负责在超时后断开。"""
-        try:
-            while True:
-                await asyncio.sleep(interval_s)
-                for conn in list(self.connections):
-                    conn.send(envelope(MessageType.PING, session_id=conn.session_id, payload={}))
-        except asyncio.CancelledError:
-            return
 
     async def close_all(self) -> None:
         for conn in list(self.connections):

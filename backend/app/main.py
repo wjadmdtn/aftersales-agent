@@ -98,7 +98,7 @@ async def lifespan(app: FastAPI):
     from app.agent.intent import IntentClassifier
     from app.agent.session import SessionStore
     from app.agent.tools.client import MockServiceClient
-    from app.api import agent_routes, chat_routes, handoff_routes, ws_routes
+    from app.api import agent_routes, handoff_routes
     from app.chat.hub import Hub
     from app.chat.messages import MessageStore
     from app.chat.redis import make_redis

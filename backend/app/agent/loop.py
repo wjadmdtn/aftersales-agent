@@ -35,7 +35,6 @@ from app.models.agent import (
     IntentSource,
     PendingConfirmation,
     SessionState,
-    TurnRecord,
 )
 from app.models.enums import ResultCode
 from app.policy.models import RetrievalDecision
@@ -710,14 +709,3 @@ def _parse_dt(value):
             return None
     return value
 
-
-def to_turn(turn: int, message: str, reply: AgentReply) -> TurnRecord:
-    return TurnRecord(
-        turn=turn,
-        user_input=message,
-        intent=reply.intent,
-        source=reply.source,
-        tool_calls=reply.tool_calls,
-        reply=reply.reply,
-        snapshot_mismatch=reply.snapshot_mismatch,
-    )

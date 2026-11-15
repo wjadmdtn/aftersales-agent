@@ -83,6 +83,7 @@ async def _serve(conn: Connection, hub: Hub) -> None:
             continue
 
         if frame.type is MessageType.PONG:
+            get_chat().hub.touch_pong(conn)
             continue
         if frame.type is MessageType.USER_MESSAGE:
             await streamer.handle_user_message(conn, frame)
@@ -132,6 +133,11 @@ async def ws_chat(websocket: WebSocket, session_id: str, user_id: str,
 
     conn = Connection(ws=websocket, role="user", user_id=user_id, session_id=session_id)
     rt.hub.register(conn)
+    rt.hub.start_heartbeat(
+        conn,
+        interval_s=settings.ws_heartbeat_interval_s,
+        idle_timeout_s=settings.ws_idle_timeout_s,
+    )
     await _hello(conn)
     try:
         await _serve(conn, rt.hub)
@@ -149,6 +155,11 @@ async def ws_agent(websocket: WebSocket, agent_id: str | None = None) -> None:
     rt = get_chat()
     conn = Connection(ws=websocket, role="agent", agent_id=agent_id)
     rt.hub.register(conn)
+    rt.hub.start_heartbeat(
+        conn,
+        interval_s=settings.ws_heartbeat_interval_s,
+        idle_timeout_s=settings.ws_idle_timeout_s,
+    )
     await _hello(conn)
     # 连上先给一次完整队列，避免依赖增量事件
     from app.api.handoff_routes import get_coordinator

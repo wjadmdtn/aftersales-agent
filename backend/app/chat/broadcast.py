@@ -163,12 +163,6 @@ async def on_resolved(session_id: str) -> None:
     await broadcast_state(session_id)
 
 
-async def ensure_session_state(session_id: str, *, user_id: str,
-                               order_id: str | None) -> None:
-    """建会话时写入 NORMAL，让 AI 服务期间也有可读状态。"""
-    rt = get_chat()
-    await rt.registry.ensure(session_id, user_id=user_id, order_id=order_id)
-
 
 DEFAULT_AGENT_ID = settings.demo_agent_id
 DEFAULT_AGENT_NAME = settings.demo_agent_name

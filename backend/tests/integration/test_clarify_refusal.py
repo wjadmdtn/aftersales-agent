@@ -4,15 +4,15 @@
 新口径把问题从根上解决——**AI 根本不问这句话了**：
 抱怨、不满、说不清，一律由 AI 继续追问；只有明确投诉/要人工/差评才转。
 
-本文件保留两条价值最高的回归：
-1. 用户拒绝过转人工后，后续说话不得再被自动转
-2. 拒绝语识别（句首匹配，不误伤"东西我不要了"这类诉求）
+本文件保留一条回归：抱怨多轮之后仍不得自动转人工。
+
+（原「拒绝语识别」一组随 is_handoff_refusal / is_handoff_agreement 一并删除——
+那套逻辑服务于已废弃的"AI 主动问要不要转人工"流程。）
 """
 from __future__ import annotations
 
 import pytest
 
-from app.agent.clarify import is_handoff_agreement, is_handoff_refusal
 from app.agent.intent import IntentClassifier
 from app.agent.llm.stub import StubLLMClient
 from app.agent.loop import AgentLoop
@@ -78,28 +78,3 @@ async def test_complaint_never_offers_handoff_then_refusal_is_moot(make_loop):
     r2 = await _say(loop, "s-refuse", "之前退货就很麻烦")
     assert r2.state == "clarifying"
     assert "人工" not in r2.reply, f"第 2 轮不该提人工：{r2.reply}"
-
-
-# ---------- 拒绝语识别（保留给未来可能的"确认式转人工"场景） ----------
-
-
-@pytest.mark.parametrize(
-    "text",
-    ["不用", "不用了", "不用 之前退货就很麻烦", "不需要谢谢", "算了", "先不用", "不"],
-)
-def test_refusal_is_recognized(text):
-    assert is_handoff_refusal(text), f"「{text}」应识别为拒绝"
-
-
-@pytest.mark.parametrize(
-    "text",
-    ["东西我不要了", "我不想留了，退啦", "我要退款", "取消订单"],
-)
-def test_refusal_does_not_swallow_business_requests(text):
-    """句中出现"不要/不"不等于拒绝转人工——那是正常业务诉求。"""
-    assert not is_handoff_refusal(text), f"「{text}」是业务诉求，不该判为拒绝"
-
-
-@pytest.mark.parametrize("text", ["好的", "可以", "行", "要", "转吧", "好的。"])
-def test_agreement_is_recognized(text):
-    assert is_handoff_agreement(text)

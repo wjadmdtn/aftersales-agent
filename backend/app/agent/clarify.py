@@ -47,34 +47,3 @@ def clarify_round_two() -> str:
 def comfort_reply() -> str:
     """情绪类唯一回应：一句道歉，别的什么都不做。多轮重复此句。"""
     return COMFORT
-
-
-# AI 问过"需要帮您转接到人工客服吗"之后，用户可能这样回答。
-# 拒绝判定用"句首/短句包含"，因为真实回答常带后文：
-#   「不用 之前退货就很麻烦」「算了，我就是吐槽一下」
-REFUSE_PREFIXES = (
-    "不用", "不需要", "不要", "不了", "先不", "算了", "暂时不",
-    "别", "无需", "没事", "不必", "不想",
-)
-AGREE_WORDS = frozenset({"好的", "好", "可以", "行", "要", "需要", "转吧", "转", "嗯", "对", "是的"})
-
-
-def is_handoff_refusal(text: str) -> bool:
-    """用户是否在拒绝转人工。
-
-    只认句首：句中出现"不要"不代表拒绝（"东西我不要了"是退款诉求）。
-    """
-    t = text.strip()
-    if not t:
-        return False
-    # 独立成句的短回答
-    if t in ("不", "否"):
-        return True
-    head = t[:6]
-    return any(head.startswith(p) for p in REFUSE_PREFIXES)
-
-
-def is_handoff_agreement(text: str) -> bool:
-    """用户是否同意转人工（精确匹配短回答，避免"好的"被误当成其他意思）。"""
-    t = text.strip().rstrip("。！!~～ ")
-    return t in AGREE_WORDS

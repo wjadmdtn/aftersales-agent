@@ -120,16 +120,6 @@ class SessionState(BaseModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
-class TurnRecord(BaseModel):
-    turn: int
-    user_input: str
-    intent: Intent | None
-    source: IntentSource
-    confidence: float | None = None
-    tool_calls: list[str] = Field(default_factory=list)
-    reply: str = ""
-    snapshot_mismatch: bool = False
-
 
 def now() -> datetime:
     return datetime.now(timezone.utc)
