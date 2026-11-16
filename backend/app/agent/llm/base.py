@@ -11,7 +11,17 @@ from app.policy.models import PolicyAnswer, RetrievalResult
 
 
 class LLMError(RuntimeError):
-    """LLM 调用失败：超时、报错、返回不合法。触发本次请求降级。"""
+    """LLM 调用失败：超时、报错、返回不合法。触发本次请求降级。
+
+    schema=True 表示失败原因是"输出结构不合法"而不是网络/超时。
+    上层据此区分：结构失败要标记 schema_retries_exhausted（走 SYSTEM_ERROR 转人工），
+    网络失败要累加 llm_timeout_streak。两者处置不同，混在一起会把模型抽风
+    算成系统故障。
+    """
+
+    def __init__(self, message: str = "", *, schema: bool = False):
+        super().__init__(message)
+        self.schema = schema
 
 
 @runtime_checkable

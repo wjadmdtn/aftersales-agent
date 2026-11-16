@@ -77,6 +77,27 @@ async def test_logistics_read_flow(chat):
     assert "南京" in r["reply"]
 
 
+async def test_change_address_without_new_address_asks_first(chat, env):
+    """没说新地址就不弹确认——否则用户确认的是个空地址，服务端必拒。"""
+    r = await chat("我要改地址", order="ORD1002")
+    assert r["intent"] == Intent.CHANGE_ADDRESS
+    assert r["state"] == "need_address"
+    assert "新的收货人" in r["reply"]
+
+    order = (await env["mock_client"].get("/orders/ORD1002")).json()
+    assert order["data"]["address"]["receiver"] != ""
+
+
+async def test_change_address_with_address_shows_confirmation(chat, env):
+    """带了地址信息才弹确认，且确认文案里能看到地址内容。"""
+    r = await chat("我要改成别的地址", order="ORD1002")
+    assert r["state"] == "need_address"
+
+    r2 = await chat("改为北京市朝阳区建国路4号 13800138000", order="ORD1002")
+    assert r2["state"] == "awaiting_confirmation"
+    assert "确认" in r2["reply"]
+
+
 async def test_exchange_gives_self_service_path(chat, env):
     """换货不由 AI 办理：告知条件 + 自助入口，不弹确认、不调工具、不改订单。"""
     r = await chat("我想换个货", order="ORD1002")
@@ -118,11 +139,11 @@ async def test_complaint_does_not_trigger_action(chat, env):
     assert order["data"]["status"] == "PAID"
 
 
-async def test_unknown_input_asks_clarification(chat):
-    """识别不到工具时先引导/澄清，不直接转人工。"""
+async def test_unknown_input_introduces_capability(chat):
+    """闲聊/问能力：介绍能做什么，不道歉、不转人工。"""
     r = await chat("随便说点什么")
     assert r["state"] == "clarifying"
-    assert "具体情况" in r["reply"]
+    assert "售后客服助手" in r["reply"]
     assert "抱歉" not in r["reply"], "无关输入不道歉"
 
 

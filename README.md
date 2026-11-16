@@ -14,6 +14,34 @@
 | [004 评测集与回归](specs/004-evaluation/) | ✅ 完成 |
 | [005 政策 RAG](specs/005-policy-rag/) | ✅ 完成 |
 | [006 客服前端（订单页 + 对话页 + 人工工作台）](specs/006-web-ui/) | ✅ 完成，547 后端测试 + 37 前端测试 + 7 E2E 通过 |
+| [007 LLM 输出校验重放](specs/007-llm-schema-replay/) | ✅ 完成，618 后端测试通过 |
+
+## LLM 输出校验重放（007）
+
+模型是概率系统，`response_format: json_object` 只保证"是 JSON"，不保证"字段对"。
+此前结构不合法就直接抛错，`with_retry` 用**同一句 prompt** 在温度 0 下重试三次——
+大概率复现同一个错，最后降级说"系统繁忙"，用户根本不知道是模型没按格式回。
+
+现在改成**带错误重放**：
+
+| 阶段 | 行为 |
+|---|---|
+| 首次返回 | 经严格校验器（`app/agent/llm/schema.py`）整体校验，任一字段非法即整体失败 |
+| 失败后 | 把上一轮原文 + **可执行的错误说明**（报字段名、期望取值、实际收到什么）一起喂回去重放 |
+| 重放次数 | 可配 `MOCK_SCHEMA_REPLAY_ATTEMPTS`，默认 1（每加 1 = 多一次模型调用） |
+| 仍失败 | 标记会话 `schema_retries_exhausted`，本轮降级不猜意图；**下一轮**直接按 SYSTEM_ERROR 转人工 |
+
+三条刻意的取舍：
+
+1. **整体校验，不部分采纳。** 截断输出里可能恰好包含合法的 `{"intent":"refund"`，
+   允许"只取能解析的部分"就等于让一次模型抽风变成一次真实退款。
+2. **`mode` 是必填字段。** 缺字段就按 EXECUTE 兜底，等于模型少写一个字段就能退钱。
+   上线前实测过：真实模型在 172 条意图识别样本里漏 `mode` 的比例为 **0%**，改必填是安全的。
+   显式 `mode: null` 仍被接受（模型对 unknown 类输入常这么回）。
+3. **结构失败不再走三次盲重试。** 客户端已经带错误重放过，再盲重试只是拖长等待。
+
+指标在 `/agent/health/llm`：`schema_replays` 多而 `schema_failures` 少 = 模型偶尔抽风；
+`schema_failures` 多 = prompt 或模型能力不匹配，该改 prompt 而不是加大重放次数。
 
 ## 政策 RAG 演进（005 之后）
 
@@ -89,7 +117,10 @@ cd backend && PYTHONIOENCODING=utf-8 python -m pytest -q
 > 需要额外装 `sentence-transformers`（会拉 torch，体积较大）：
 >
 > ```bash
-> uv pip install sentence-transformers
+> # 必须锁 3.x：sentence-transformers 6.x 会强制 transformers>=5，
+> # 而 transformers 5 已移除 bge-small-zh-v1.5 这类模型的旧式加载路径，
+> # 装成 6.x 会在启动时抛 "Unrecognized processing class in BAAI/bge-small-zh-v1.5"
+> uv pip install "sentence-transformers>=3.4,<4"
 > ```
 >
 > 不装也不要紧——把它设成 `stub` 或删掉该行即可，检索逻辑照常跑，只是相似度是

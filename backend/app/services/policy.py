@@ -69,7 +69,10 @@ class PolicyService:
         product_type: str | None,
         search_query: str | None = None,
     ) -> tuple[PolicyAnswer, RetrievalResult]:
-        retrieval = self.retriever.retrieve(
+        # 检索是同步 CPU 计算（embedding + 相似度），直接 await 会让整个事件循环
+        # 停住——并发评测时一个 worker 算检索，其余 worker 的请求全被卡。放线程池。
+        retrieval = await asyncio.to_thread(
+            self.retriever.retrieve,
             query=(search_query or "").strip() or question,
             order_created_at=order_created_at,
             product_type=product_type,
@@ -83,7 +86,8 @@ class PolicyService:
             and rewritten
             and rewritten != question
         ):
-            retrieval = self.retriever.retrieve(
+            retrieval = await asyncio.to_thread(
+                self.retriever.retrieve,
                 query=question,
                 order_created_at=order_created_at,
                 product_type=product_type,

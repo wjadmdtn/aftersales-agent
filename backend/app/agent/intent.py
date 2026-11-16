@@ -32,15 +32,32 @@ def collect_hints(user_input: str, keyword_map: dict[str, list[str]] | None = No
     return list(dict.fromkeys(hits))
 
 
+class ClassifyResult:
+    """意图识别结果 + 失败原因分类。
+
+    调用方需要区分三种情况，处置完全不同：
+    - 成功 → 正常分派
+    - 结构失败（schema=True）→ 降级本轮，并标记会话 schema_retries_exhausted，
+      下一轮由 triggers 走 SYSTEM_ERROR 转人工
+    - 网络/超时失败 → 降级本轮，累加 llm_timeout_streak
+    """
+
+    __slots__ = ("result", "error", "schema_exhausted")
+
+    def __init__(self, result: IntentResult | None, error: LLMError | None = None):
+        self.result = result
+        self.error = error
+        self.schema_exhausted = bool(error is not None and getattr(error, "schema", False))
+
+
 class IntentClassifier:
     def __init__(self, llm: LLMClient, keyword_map: dict[str, list[str]] | None = None):
         self.llm = llm
         self.keyword_map = keyword_map if keyword_map is not None else settings.keyword_hints
 
-    async def classify(
+    async def classify_detailed(
         self, user_input: str, *, context: dict[str, Any] | None = None
-    ) -> tuple[IntentResult | None, LLMError | None]:
-        """返回 (结果, 错误)。错误非空表示 LLM 不可用，调用方须走降级。"""
+    ) -> ClassifyResult:
         hints = collect_hints(user_input, self.keyword_map)
 
         async def _call():
@@ -51,8 +68,17 @@ class IntentClassifier:
             )
 
         try:
-            # 意图判断无副作用，可安全重试；三轮仍失败才降级
             result = await with_retry(_call, label="intent.classify")
         except LLMError as e:
-            return None, e
-        return result.model_copy(update={"source": IntentSource.LLM}), None
+            return ClassifyResult(None, e)
+        return ClassifyResult(result.model_copy(update={"source": IntentSource.LLM}))
+
+    async def classify(
+        self, user_input: str, *, context: dict[str, Any] | None = None
+    ) -> tuple[IntentResult | None, LLMError | None]:
+        """返回 (结果, 错误)。错误非空表示 LLM 不可用，调用方须走降级。
+
+        保留这个签名给既有调用方与测试；需要区分结构失败时用 classify_detailed。
+        """
+        outcome = await self.classify_detailed(user_input, context=context)
+        return outcome.result, outcome.error

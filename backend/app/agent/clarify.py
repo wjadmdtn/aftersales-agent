@@ -6,6 +6,14 @@ APOLOGY = "非常抱歉给您带来了不好的体验。"
 CLARIFY_FIRST_NEGATIVE = APOLOGY + "方便说下具体情况吗？我帮您记录一下。"
 CLARIFY_FIRST_NEUTRAL = "方便说下您遇到的具体情况吗？我帮您看看怎么处理。"
 
+# 闲聊 / 能力询问 / 误触：介绍能做什么，再把话头交回用户。
+# 这类输入没有抱怨成分，回"您遇到什么情况"会答非所问——用户根本没遇到问题。
+CAPABILITY_INTRO = (
+    "我是您的售后客服助手，可以帮您处理："
+    "订单和物流查询、售后申请（退、换、修）、政策咨询（发票、价保、运费）。"
+    "您想了解哪方面？"
+)
+
 # 第 2 轮继续追问，**不再征求转人工**。
 # 产品口径：抱怨类不该被推向人工；只有明确投诉/要人工/差评才转，
 # 那些在意图层就拦下了。这里只负责把诉求问出来。
@@ -16,7 +24,13 @@ CLARIFY_SECOND = "了解了。方便再具体说下是哪方面的问题吗？�
 # 追问细节会把"吐槽"变成"被盘问"；转人工则把人工成本吃光。
 COMFORT = APOLOGY
 
-ALL_SCRIPTS = (CLARIFY_FIRST_NEGATIVE, CLARIFY_FIRST_NEUTRAL, CLARIFY_SECOND, APOLOGY)
+ALL_SCRIPTS = (
+    CLARIFY_FIRST_NEGATIVE,
+    CLARIFY_FIRST_NEUTRAL,
+    CLARIFY_SECOND,
+    APOLOGY,
+    CAPABILITY_INTRO,
+)
 
 # 禁止出现的业务承诺词。AI 说出去的承诺与人工客服同等效力，
 # 一旦提及就是在替商家做主。

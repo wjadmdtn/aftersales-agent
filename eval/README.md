@@ -10,7 +10,17 @@ python eval/runner.py --llm=stub
 
 # 出效果数字（简历/README 只引用这一档）
 python eval/runner.py --llm=real --model=qwen-plus
+
+# 并发跑：每条用例一份独立订单库与会话，互不串扰
+python eval/runner.py --llm=real --model=deepseek-v4-flash --concurrency=12
 ```
+
+并发度别拍脑袋定，先跑 `python eval/probe_concurrency.py` 探网关饱和点。
+实测深寻网关在 16 并发左右吞吐见顶（约 1.3 req/s），再高只会把单个请求拖慢，
+所以 12 是留了余量的一档。
+
+跑 bge 需要本地已缓存模型，加 `HF_HUB_OFFLINE=1` 跳过联网校验，
+否则会卡在 HuggingFace Hub 重试上。
 
 `stub` 的报告会显式标注**不可对外引用**——桩按关键词返回，准确率虚高。
 

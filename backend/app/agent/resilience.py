@@ -36,6 +36,11 @@ class RetryStats:
     successes: int = 0
     failures: int = 0
     retried_successes: int = 0
+    # 结构不合法：带错误重放的次数、最终仍不合法的次数。
+    # 两个数分开看才说明问题：重放多而失败少 = 模型偶尔抽风；
+    # 失败多 = prompt 或模型能力不匹配，该改 prompt 而不是加大重放。
+    schema_replays: int = 0
+    schema_failures: int = 0
     recent_failures: list[float] = field(default_factory=list)
 
     @property
@@ -67,7 +72,15 @@ class RetryStats:
         self.successes = 0
         self.failures = 0
         self.retried_successes = 0
+        self.schema_replays = 0
+        self.schema_failures = 0
         self.recent_failures.clear()
+
+    def record_schema_replay(self) -> None:
+        self.schema_replays += 1
+
+    def record_schema_failure(self) -> None:
+        self.schema_failures += 1
 
 
 stats = RetryStats()
@@ -93,6 +106,10 @@ async def with_retry(fn, *, policy: RetryPolicy | None = None, label: str = "llm
         except LLMError as e:
             last_error = e
             logger.warning("%s 第 %d 次失败：%s", label, attempt + 1, e)
+            # 结构不合法不再盲重试：客户端已经带错误信息重放过，同样的 prompt
+            # 在温度 0 下只会复现同一个错，再重试纯粹是拖长用户等待。
+            if getattr(e, "schema", False):
+                break
             if attempt < p.attempts - 1:
                 await asyncio.sleep(p.delay_for(attempt))
 

@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import logging
+from contextlib import contextmanager
+from contextvars import ContextVar
 from decimal import Decimal
 
 from fastapi import APIRouter, Request
@@ -26,12 +28,31 @@ router = APIRouter()
 _store: MemoryStore | None = None
 _recorder = CallRecorder(capacity=settings.call_record_capacity)
 
+# 评测并发时每个 worker 需要自己的订单库，又不想把 store 顺着调用链层层传参。
+# 用 ContextVar 让 worker 在自己的 task 里覆盖，未覆盖时回落全局单例——
+# 生产路径没人 set，行为与原来完全一致。
+_store_override: ContextVar[MemoryStore | None] = ContextVar(
+    "mock_store_override", default=None
+)
+
 
 def get_store() -> MemoryStore:
+    override = _store_override.get()
+    if override is not None:
+        return override
     global _store
     if _store is None:
         _store = MemoryStore(settings.seed_path, settings.refund_lock_shards)
     return _store
+
+
+@contextmanager
+def use_store(store: MemoryStore):
+    token = _store_override.set(store)
+    try:
+        yield
+    finally:
+        _store_override.reset(token)
 
 
 def get_recorder() -> CallRecorder:
@@ -159,4 +180,4 @@ async def debug_calls(
     return {"records": [r.model_dump(mode="json") for r in records]}
 
 
-__all__ = ["router", "get_store", "get_recorder", "reset_store", "ResultCode"]
+__all__ = ["router", "get_store", "get_recorder", "reset_store", "use_store", "ResultCode"]

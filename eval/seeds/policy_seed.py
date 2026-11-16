@@ -48,8 +48,8 @@ POLICY_QUESTIONS = [
     ("logistics-fake", "显示签收但没收到怎么办", "LOGISTICS-02", DEFAULT_ORDER),
     ("logistics-damage", "运输中破损了怎么处理", "LOGISTICS-03", DEFAULT_ORDER),
     # 订单修改
-    ("address-rule", "还没发货可以改地址吗", "ORDER-ADDRESS-01", DEFAULT_ORDER),
-    ("spec-change", "能换颜色换尺码吗", "ORDER-ADDRESS-02", DEFAULT_ORDER),
+    ("address-rule", "改收货地址要收费吗", "ORDER-ADDRESS-01", DEFAULT_ORDER),
+    ("spec-change", "换尺码会额外收费吗", "ORDER-ADDRESS-02", DEFAULT_ORDER),
     # 预售
     ("presale-deposit", "预售定金能退吗", "PRESALE-01", DEFAULT_ORDER),
     ("presale-ship", "预售什么时候发货", "PRESALE-02", DEFAULT_ORDER),

@@ -44,6 +44,8 @@ class HandoffCoordinator:
         refund_amount: Decimal | None = None,
         last_tool_status: ToolStatus | None = None,
         tool_failure_streak: int = 0,
+        llm_timeout_streak: int = 0,
+        schema_retries_exhausted: bool = False,
         llm_cannot_handle: bool = False,
         rag_top_similarity: float | None = None,
     ) -> TriggerResult:
@@ -52,6 +54,8 @@ class HandoffCoordinator:
             refund_amount=refund_amount,
             last_tool_status=last_tool_status,
             tool_failure_streak=tool_failure_streak,
+            llm_timeout_streak=llm_timeout_streak,
+            schema_retries_exhausted=schema_retries_exhausted,
             llm_cannot_handle=llm_cannot_handle,
             rag_top_similarity=rag_top_similarity,
         )

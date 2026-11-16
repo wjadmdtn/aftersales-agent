@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timedelta, timezone
 from enum import StrEnum
 from decimal import Decimal
@@ -60,6 +61,9 @@ def build_confirmation(
         summary=summary,
         created_at=created,
         expires_at=created + timedelta(seconds=ttl),
+        # 在这里定稿，不在确认执行时生成：确认卡到执行之间链路可能重试，
+        # 每次重试换一个新 request_id 就让业务侧的幂等去重彻底失效。
+        request_id=f"confirm:{uuid.uuid4().hex}",
     )
 
 

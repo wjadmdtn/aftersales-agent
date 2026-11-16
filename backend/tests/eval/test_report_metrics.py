@@ -60,7 +60,9 @@ def test_report_has_stub_warning():
         results=[],
     )
     md = render_markdown(report)
-    assert "不可对外引用" in md
+    # 桩报告不再展示百分比，只给通过条数
+    assert "数字无意义" in md
+    assert "| 指标 | 通过 | 总数 |" in md
 
 
 def test_report_marks_backend():

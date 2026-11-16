@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     llm_base_url: str = ""
     llm_api_key: str = ""
     llm_model: str = ""
+    # 结构不合法时带错误信息重放的次数（不含首次调用）。每加 1 = 多一次模型调用，
+    # 内网慢模型单次 20~40 秒，默认只给 1 次；调大等于让用户多等一轮。
+    schema_replay_attempts: int = Field(default=1, ge=0, le=3)
     mock_service_base_url: str = "http://localhost:8000"
 
     # 关键词仅作为提示传给 LLM，不参与意图判定

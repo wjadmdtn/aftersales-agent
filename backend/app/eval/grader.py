@@ -36,6 +36,9 @@ def grade(case: EvalCase, actual: dict[str, Any]) -> GradeResult:
         failures=failures,
         expected=case.expect,
         actual=actual,
+        input=case.input,
+        turns=case.turns,
+        notes=case.notes,
     )
 
 

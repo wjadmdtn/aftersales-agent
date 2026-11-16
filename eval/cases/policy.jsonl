@@ -18,8 +18,8 @@
 {"id":"policy-logistics-delay","category":"policy","path":"policy","input":"超时没发货有赔偿吗","context":{"order_id":"ORD1002"},"expect":{"intent":"policy","cited_clause":"LOGISTICS-01"},"notes":"政策咨询，期望命中 LOGISTICS-01"}
 {"id":"policy-logistics-fake","category":"policy","path":"policy","input":"显示签收但没收到怎么办","context":{"order_id":"ORD1002"},"expect":{"intent":"policy","cited_clause":"LOGISTICS-02"},"notes":"政策咨询，期望命中 LOGISTICS-02"}
 {"id":"policy-logistics-damage","category":"policy","path":"policy","input":"运输中破损了怎么处理","context":{"order_id":"ORD1002"},"expect":{"intent":"policy","cited_clause":"LOGISTICS-03"},"notes":"政策咨询，期望命中 LOGISTICS-03"}
-{"id":"policy-address-rule","category":"policy","path":"policy","input":"还没发货可以改地址吗","context":{"order_id":"ORD1002"},"expect":{"intent":"policy","cited_clause":"ORDER-ADDRESS-01"},"notes":"政策咨询，期望命中 ORDER-ADDRESS-01"}
-{"id":"policy-spec-change","category":"policy","path":"policy","input":"能换颜色换尺码吗","context":{"order_id":"ORD1002"},"expect":{"intent":"policy","cited_clause":"ORDER-ADDRESS-02"},"notes":"政策咨询，期望命中 ORDER-ADDRESS-02"}
+{"id":"policy-address-rule","category":"policy","path":"policy","input":"改收货地址要收费吗","context":{"order_id":"ORD1002"},"expect":{"intent":"policy","cited_clause":"ORDER-ADDRESS-01"},"notes":"政策咨询，期望命中 ORDER-ADDRESS-01"}
+{"id":"policy-spec-change","category":"policy","path":"policy","input":"换尺码会额外收费吗","context":{"order_id":"ORD1002"},"expect":{"intent":"policy","cited_clause":"ORDER-ADDRESS-02"},"notes":"政策咨询，期望命中 ORDER-ADDRESS-02"}
 {"id":"policy-presale-deposit","category":"policy","path":"policy","input":"预售定金能退吗","context":{"order_id":"ORD1002"},"expect":{"intent":"policy","cited_clause":"PRESALE-01"},"notes":"政策咨询，期望命中 PRESALE-01"}
 {"id":"policy-presale-ship","category":"policy","path":"policy","input":"预售什么时候发货","context":{"order_id":"ORD1002"},"expect":{"intent":"policy","cited_clause":"PRESALE-02"},"notes":"政策咨询，期望命中 PRESALE-02"}
 {"id":"policy-price-protect","category":"policy","path":"policy","input":"买完降价了能补差价吗","context":{"order_id":"ORD1002"},"expect":{"intent":"policy","cited_clause":"PRICE-PROTECT-01"},"notes":"政策咨询，期望命中 PRICE-PROTECT-01"}

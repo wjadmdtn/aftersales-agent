@@ -26,8 +26,12 @@ class StubLLMClient:
         classifier: Callable[[str], IntentResult] | None = None,
         policy_responses: dict[str, PolicyAnswer] | None = None,
         policy_default: PolicyAnswer | None = None,
+        invalid_times: int = 0,
     ):
         self.responses = responses or {}
+        # 每条消息的前 N 次调用返回结构非法（供重放链路测试）
+        self.invalid_times = invalid_times
+        self._invalid_seen: dict[str, int] = {}
         self.default = default or IntentResult(intent=Intent.UNKNOWN, confidence=0.5)
         self.fail_mode = fail_mode
         self.fail_times = fail_times
@@ -60,7 +64,18 @@ class StubLLMClient:
                 raise LLMError("llm timeout (stub)")
             if self.fail_mode == "error":
                 raise LLMError("llm error (stub)")
-            raise LLMError("llm returned invalid structure (stub)")
+            # 结构非法必须带 schema 标记：上层据此走"标记耗尽→转人工"而不是
+            # "盲重试三次→超时计数"，两者是不同故障
+            raise LLMError("llm returned invalid structure (stub)", schema=True)
+
+        # invalid_times 按"用户消息"计，而不是按调用次数计：
+        # 同一条消息的第 1 次返回非法（触发重放），第 2 次起返回合法。
+        # 连续 N 条消息都非法，用它验证耗尽路径。
+        key = user_input
+        seen = self._invalid_seen.get(key, 0) + 1
+        self._invalid_seen[key] = seen
+        if self.invalid_times and seen <= self.invalid_times:
+            raise LLMError("llm returned invalid structure (stub, replayable)", schema=True)
 
         if self.classifier is not None:
             return self.classifier(user_input)

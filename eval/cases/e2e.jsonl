@@ -23,12 +23,12 @@
 {"id":"e2e-lg-ok-02","category":"e2e","path":"e2e","turns":["我的包裹在哪"],"context":{"order_id":"ORD1003"},"expect":{"order_status":"SHIPPED"}}
 {"id":"e2e-od-ok-00","category":"e2e","path":"e2e","turns":["查一下我的订单"],"context":{"order_id":"ORD1002"},"expect":{"order_status":"PAID"},"notes":"查订单不改状态"}
 {"id":"e2e-od-ok-01","category":"e2e","path":"e2e","turns":["订单状态是什么"],"context":{"order_id":"ORD1002"},"expect":{"order_status":"PAID"}}
-{"id":"e2e-ad-ok-00","category":"e2e","path":"e2e","turns":["我要改地址"],"context":{"order_id":"ORD1002"},"expect":{"order_status":"PAID","first_turn_state":"awaiting_confirmation"},"notes":"未发货可改，需确认"}
-{"id":"e2e-ad-ok-01","category":"e2e","path":"e2e","turns":["我要改地址","确认"],"context":{"order_id":"ORD1002"},"expect":{"order_status":"PAID"},"notes":"确认后仍不改订单状态"}
-{"id":"e2e-ad-shipped-00","category":"e2e","path":"e2e","turns":["我要改地址","确认"],"context":{"order_id":"ORD1003"},"expect":{"order_status":"SHIPPED","never_state":"executed"},"notes":"已发货不可改，状态不变，也不得执行修改"}
-{"id":"e2e-ad-shipped-01","category":"e2e","path":"e2e","turns":["收货地址填错了","确认"],"context":{"order_id":"ORD1003"},"expect":{"order_status":"SHIPPED"},"notes":"已发货，换种说法同样被拒"}
-{"id":"e2e-ad-delivered-00","category":"e2e","path":"e2e","turns":["我要改地址","确认"],"context":{"order_id":"ORD1004"},"expect":{"order_status":"DELIVERED"},"notes":"已签收不可改"}
-{"id":"e2e-ad-inquiry-00","category":"e2e","path":"e2e","turns":["能改地址吗"],"context":{"order_id":"ORD1002"},"expect":{"order_status":"PAID","never_state":"awaiting_confirmation"},"notes":"问能不能改，只回答不执行"}
+{"id":"e2e-ad-ok-00","category":"e2e","path":"e2e","turns":["我要改地址"],"context":{"order_id":"ORD1002"},"expect":{"order_status":"PAID","first_turn_state":"need_address","never_state":"awaiting_confirmation","must_say":["收货人"]},"notes":"没说新地址：先追问，不弹空地址确认"}
+{"id":"e2e-ad-ok-01","category":"e2e","path":"e2e","turns":["我要改地址","改为北京市朝阳区建国路4号 13800138000"],"context":{"order_id":"ORD1002"},"expect":{"order_status":"PAID","first_turn_state":"need_address","last_turn_state":"awaiting_confirmation"},"notes":"给地址后弹确认，确认前不得写入"}
+{"id":"e2e-ad-shipped-00","category":"e2e","path":"e2e","turns":["我要改地址","改为北京市朝阳区建国路4号 13800138000"],"context":{"order_id":"ORD1003"},"expect":{"order_status":"SHIPPED","never_state":"executed"},"notes":"已发货不可改，状态不变，也不得执行修改"}
+{"id":"e2e-ad-shipped-01","category":"e2e","path":"e2e","turns":["收货地址填错了","改为北京市朝阳区建国路4号 13800138000"],"context":{"order_id":"ORD1003"},"expect":{"order_status":"SHIPPED"},"notes":"已发货，换种说法同样被拒"}
+{"id":"e2e-ad-delivered-00","category":"e2e","path":"e2e","turns":["我要改地址","改为北京市朝阳区建国路4号 13800138000"],"context":{"order_id":"ORD1004"},"expect":{"order_status":"DELIVERED"},"notes":"已签收不可改"}
+{"id":"e2e-ad-inquiry-00","category":"e2e","path":"e2e","turns":["能改地址吗"],"context":{"order_id":"ORD1002"},"expect":{"order_status":"PAID","never_state":"awaiting_confirmation","must_call":["order.get"],"must_not_say":["条款"],"must_say":["还没发货"]},"notes":"问能不能改：查这一单的状态后回答，不查政策库、不执行"}
 {"id":"e2e-policy-hit-00","category":"e2e","path":"e2e","turns":["退款多久能到账"],"context":{"order_id":"ORD1002"},"expect":{"order_status":"PAID","never_state":"handoff_queued","must_say":["工作日"]},"notes":"政策能答：不应转人工"}
 {"id":"e2e-policy-hit-01","category":"e2e","path":"e2e","turns":["七天无理由怎么算"],"context":{"order_id":"ORD1002"},"expect":{"order_status":"PAID","never_state":"handoff_queued"},"notes":"政策能答"}
 {"id":"e2e-policy-miss-00","category":"e2e","path":"e2e","turns":["换货多久能完成"],"context":{"order_id":"ORD1002"},"expect":{"order_status":"PAID","last_turn_state":"handoff_queued","must_not_say":["天"]},"notes":"知识库没这条，必须转人工不得编造"}

@@ -12,7 +12,9 @@ import asyncio
 import os
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
@@ -27,9 +29,11 @@ import app.api.routes as mock_routes  # noqa: E402
 from app.agent.intent import IntentClassifier  # noqa: E402
 from app.agent.llm.base import LLMError  # noqa: E402
 from app.agent.llm.openai_compat import OpenAICompatLLMClient  # noqa: E402
+from app.agent.loop import AgentLoop  # noqa: E402
 from app.agent.session import SessionStore  # noqa: E402
 from app.agent.tools.client import MockServiceClient  # noqa: E402
 from app.api import agent_routes  # noqa: E402
+from app.config import settings  # noqa: E402
 from app.eval import report as report_mod  # noqa: E402
 from app.eval.baseline import apply_comparison, load_baseline, save_baseline  # noqa: E402
 from app.eval.grader import grade  # noqa: E402
@@ -41,6 +45,7 @@ from app.handoff.queue import HandoffQueue  # noqa: E402
 from app.main import create_app  # noqa: E402
 from app.models.agent import Intent, IntentResult  # noqa: E402
 from app.models.enums import OrderStatus, ResultCode  # noqa: E402
+from app.store.memory import MemoryStore  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 
 CASES_DIR = ROOT / "eval" / "cases"
@@ -116,14 +121,12 @@ class RecordingLLM:
             self.seconds += time.perf_counter() - start
 
 
-async def build_env(backend: str, model: str | None, embedder: str = "stub"):
-    mock_routes.reset_store()
-    mock_app = create_app()
+async def build_shared(backend: str, model: str | None, embedder: str = "stub"):
+    """worker 之间共享的部分：LLM 客户端与政策服务。
 
-    redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
-    store = SessionStore(redis, ttl_seconds=3600)
-    tools = InProcessMock(mock_app)
-
+    两者都无每条用例的状态，且都不便宜——LLM 客户端复用连接，
+    政策服务持有一份 embedding 模型（每次重建要重新加载权重）。
+    """
     if backend == "real":
         inner = OpenAICompatLLMClient(model=model)
         llm = RecordingLLM(inner)
@@ -134,20 +137,48 @@ async def build_env(backend: str, model: str | None, embedder: str = "stub"):
 
     # 政策服务必须显式装配，否则 POLICY 意图走不到检索，政策用例恒为 0
     policy = _build_eval_policy(llm, embedder)
+    return llm, policy
 
-    classifier = IntentClassifier(llm, keyword_map={})
-    coordinator = HandoffCoordinator(HandoffQueue(redis))
-    agent_routes.configure_agent(
-        classifier=classifier,
-        sessions=store,
-        tools=tools,
-        coordinator=coordinator,
+
+def build_worker(llm, policy):
+    """一个评测 worker 的独占状态：订单库、会话库、AgentLoop。
+
+    并发跑用例时这些必须隔离——每条用例开跑前要把订单库和会话清回种子状态，
+    共用一份的话，A 用例的清理会清掉 B 用例跑到一半的会话。
+    """
+    redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    loop = AgentLoop(
+        classifier=IntentClassifier(llm, keyword_map={}),
+        sessions=SessionStore(redis, ttl_seconds=3600),
+        tools=InProcessMock(_worker_app()),
+        coordinator=HandoffCoordinator(HandoffQueue(redis)),
         policy=policy,
     )
+    return _WorkerEnv(
+        redis=redis,
+        loop=loop,
+        memory=MemoryStore(settings.seed_path, settings.refund_lock_shards),
+    )
 
-    agent_app = create_app()
-    client = AsyncClient(transport=ASGITransport(app=agent_app), base_url="http://agent")
-    return client, mock_app, redis, llm, store
+
+_APP = None
+
+
+def _worker_app():
+    """所有 worker 共用一个 app 实例：app 本身无状态，
+    状态全在全局单例或 ContextVar 里，重复 create_app 只会重复挂载静态目录。
+    """
+    global _APP
+    if _APP is None:
+        _APP = create_app()
+    return _APP
+
+
+@dataclass
+class _WorkerEnv:
+    redis: Any
+    loop: Any
+    memory: Any
 
 
 def _build_eval_policy(llm, embedder: str):
@@ -167,6 +198,17 @@ def _build_eval_policy(llm, embedder: str):
     else:
         settings.rag_similarity_threshold = 0.64
         settings.rag_ambiguity_margin = 0.0
+        # 并发时多个 worker 排队做 CPU 推理，30s 会把正常检索误判成超时；
+        # 真实检索本身只要几百毫秒，放宽只影响"卡死"的上限。
+        settings.rag_timeout_ms = 180_000
+        try:
+            import torch
+
+            # N 个 worker 并发 encode，各自默认占满所有核会互相抢，
+            # 单线程反而总吞吐更高。
+            torch.set_num_threads(1)
+        except ImportError:  # pragma: no cover - 未装 bge 时才没有 torch
+            pass
 
     settings.rag_embedder = embedder
 
@@ -311,6 +353,25 @@ async def run_case(client, mock_app, case: EvalCase, trace: str) -> dict:
     return out
 
 
+async def run_one(env: _WorkerEnv, client, case: EvalCase, idx: int):
+    """跑一条用例，并把 ContextVar 指向本 worker 的订单库与 loop。
+
+    重置走 worker 私有的 memory/redis，不能用全局 reset_store 与 redis.flushall——
+    那会把别的 worker 正在跑的用例状态一起清掉。
+    """
+    env.memory.reset()
+    await env.redis.flushall()
+    trace = f"{case.id}-{idx}".ljust(32, "0")[:32]
+    with mock_routes.use_store(env.memory), agent_routes.use_loop(env.loop):
+        try:
+            actual = await run_case(client, _worker_app(), case, trace)
+        except LLMError as e:
+            actual = {"error": str(e)}
+        except Exception as e:  # noqa: BLE001
+            actual = {"error": f"{type(e).__name__}: {e}"}
+        return grade(case, actual)
+
+
 async def main_async(args) -> int:
     cases = load_dir(CASES_DIR)
     if args.only:
@@ -319,26 +380,38 @@ async def main_async(args) -> int:
         if not cases:
             print(f"没有匹配的用例路径：{args.only}")
             return 1
-    client, mock_app, redis, llm, store = await build_env(args.llm, args.model, args.embedder)
+    if args.limit:
+        cases = cases[: args.limit]
 
-    results = []
+    llm, policy = await build_shared(args.llm, args.model, args.embedder)
+    concurrency = max(1, args.concurrency)
+    workers = [build_worker(llm, policy) for _ in range(min(concurrency, len(cases)))]
+    # 共享一个 client：ASGITransport 是进程内直连，连接池无意义，并发 post 本身安全
+    client = AsyncClient(transport=ASGITransport(app=_worker_app()), base_url="http://agent")
+
+    queue: asyncio.Queue = asyncio.Queue()
+    for i, case in enumerate(cases):
+        queue.put_nowait((i, case))
+    results: list = [None] * len(cases)
+
+    async def drain(env: _WorkerEnv):
+        while True:
+            try:
+                idx, case = queue.get_nowait()
+            except asyncio.QueueEmpty:
+                return
+            results[idx] = await run_one(env, client, case, idx)
+
     started = time.perf_counter()
     try:
-        for i, case in enumerate(cases, 1):
-            # 每条用例前重置状态，避免互相污染（FR-022）
-            mock_routes.reset_store()
-            await redis.flushall()
-            trace = f"{case.id}-{i}".ljust(32, "0")[:32]
-            try:
-                actual = await run_case(client, mock_app, case, trace)
-            except LLMError as e:
-                actual = {"error": str(e)}
-            except Exception as e:  # noqa: BLE001
-                actual = {"error": f"{type(e).__name__}: {e}"}
-            results.append(grade(case, actual))
+        await asyncio.gather(*(drain(w) for w in workers))
     finally:
         await client.aclose()
-        await redis.aclose()
+        inner = getattr(llm, "inner", None)
+        if inner is not None and hasattr(inner, "aclose"):
+            await inner.aclose()
+        for w in workers:
+            await w.redis.aclose()
 
     elapsed = time.perf_counter() - started
     report = EvalReport(
@@ -355,15 +428,52 @@ async def main_async(args) -> int:
 
     md, js = report_mod.write_report(report, REPORT_DIR)
     if args.update_baseline:
-        save_baseline(BASELINE, report)
+        if args.llm != "real":
+            print(
+                "\n⚠ 桩模式不能写基线：桩的准确率没有意义，基线只来自真实模型。已跳过。"
+            )
+        else:
+            save_baseline(BASELINE, report)
+
+    from app.eval.html_report import write_html
+
+    stamp = Path(js).stem.replace("report-", "")
+    page = write_html(report, REPORT_DIR / f"report-{stamp}.html")
+    latest = write_html(report, REPORT_DIR / "latest.html")
 
     print(report_mod.render_markdown(report))
-    print(f"\n报告：{md}\n      {js}")
+    print(f"\n报告：{md}\n      {js}\n      {page}\n最新：{latest}")
+
+    if not args.no_open:
+        _open_in_browser(latest)
 
     if isinstance(llm, RecordingLLM):
         print(f"LLM 调用 {llm.calls} 次，累计 {llm.seconds:.1f}s")
 
     return 1 if report.blocked else 0
+
+
+def _open_in_browser(path: Path) -> None:
+    """打开本地 HTML。Windows 上 webbrowser.open 常被默认程序设置吃掉，
+    优先用 Start-Process，失败再退回 webbrowser。"""
+    import subprocess
+    import sys
+    import webbrowser
+
+    try:
+        if sys.platform == "win32":
+            subprocess.Popen(
+                ["powershell", "-NoProfile", "-Command", f"Start-Process '{path.resolve()}'"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        else:
+            webbrowser.open(path.resolve().as_uri())
+    except Exception:  # noqa: BLE001 - 打不开不影响评测结果
+        try:
+            webbrowser.open(path.resolve().as_uri())
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def main() -> int:
@@ -385,6 +495,23 @@ def main() -> int:
         "--only",
         default=None,
         help="只跑指定路径，逗号分隔：e2e,policy,clarify,handoff,irrelevant,business_action",
+    )
+    p.add_argument(
+        "--no-open",
+        action="store_true",
+        help="生成 HTML 报告但不自动打开浏览器（CI 用）",
+    )
+    p.add_argument(
+        "--concurrency",
+        type=int,
+        default=1,
+        help="并发 worker 数。1 为串行；LLM 网关实测饱和点约 16，建议 12",
+    )
+    p.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="只跑前 N 条，用于小批验证并行与串行结果是否一致",
     )
     p.add_argument("--update-baseline", action="store_true")
     p.add_argument("--no-baseline", action="store_true")

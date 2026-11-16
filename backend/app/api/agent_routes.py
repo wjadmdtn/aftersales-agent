@@ -1,6 +1,8 @@
 """Agent 对话接口。"""
 from __future__ import annotations
 
+from contextlib import contextmanager
+from contextvars import ContextVar
 from decimal import Decimal
 from typing import Any
 
@@ -43,6 +45,12 @@ class ChatResponse(BaseModel):
 
 _loop: AgentLoop | None = None
 
+# 评测并发时每个 worker 跑自己的 AgentLoop（独立会话库与工具客户端），
+# 又不想把 loop 顺着路由层传参。ContextVar 覆盖，未覆盖回落全局单例。
+_loop_override: ContextVar[AgentLoop | None] = ContextVar(
+    "agent_loop_override", default=None
+)
+
 
 def configure_agent(
     *,
@@ -65,9 +73,21 @@ def configure_agent(
 
 
 def get_loop() -> AgentLoop:
+    override = _loop_override.get()
+    if override is not None:
+        return override
     if _loop is None:
         raise RuntimeError("agent loop is not configured")
     return _loop
+
+
+@contextmanager
+def use_loop(loop: AgentLoop):
+    token = _loop_override.set(loop)
+    try:
+        yield
+    finally:
+        _loop_override.reset(token)
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -115,6 +135,10 @@ async def llm_health() -> dict:
         "failures": stats.failures,
         "failure_rate": round(stats.failure_rate, 4),
         "retry_rate": round(stats.retry_rate, 4),
+        # 结构类失败单独看：重放多而失败少 = 模型偶尔抽风；
+        # 失败多 = prompt 或模型能力不匹配，该改 prompt 而不是加大重放次数
+        "schema_replays": stats.schema_replays,
+        "schema_failures": stats.schema_failures,
         "failures_last_10min": len(stats.recent_failures),
         "degraded": stats.total_calls > 0 and stats.failure_rate > 0.2,
     }

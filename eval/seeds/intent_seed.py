@@ -102,8 +102,8 @@ ADVERSARIAL = [
     (("先别退款，我改个地址"), "change_address"),
     # 含关键词但问的是别的
     (("我退款的那个订单物流到哪了"), "logistics"),
-    (("退款之后地址还能改吗"), "policy", "inquiry"),  # 条款缺该场景，退化为政策咨询
-    (("退款记录在哪看"), "policy", "inquiry"),  # 功能入口咨询，非本单状态查询
+    (("退款之后地址还能改吗"), "policy", "inquiry"),  # 问的是"退款后退货流程里能否改地址"的规则
+    (("退款记录在哪看"), "unknown", "execute"),  # 功能入口询问，归 unknown 走能力介绍
     # 语气词干扰
     (("嗯……退款吧"), "refund", "execute"),  # "退款吧"是祈使，要执行
     (("那个……我想问下退货的事"), "policy", "inquiry"),  # 问规则，不是发起退货
@@ -185,7 +185,7 @@ def build() -> list:
                 mode=_mode("logistics"),
             )
         )
-    AD_INQUIRY = {"能修改收货地址吗"}
+    AD_INQUIRY = {"能修改收货地址吗", "我地址写错了"}  # 陈述问题未提要求 → 先回答不直接执行
     for i, text in enumerate(STANDARD_ADDRESS):
         mode = "inquiry" if text in AD_INQUIRY else "execute"
         cases.append(

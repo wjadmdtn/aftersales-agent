@@ -61,6 +61,10 @@ class GradeResult(BaseModel):
     failures: list[str] = Field(default_factory=list)
     expected: dict[str, Any] = Field(default_factory=dict)
     actual: dict[str, Any] = Field(default_factory=dict)
+    # 用例本身的输入，带上才能让报告自包含——否则看失败样本还得回 cases/*.jsonl 反查
+    input: str | None = None
+    turns: list[str] | None = None
+    notes: str | None = None
 
 
 class MetricLine(BaseModel):

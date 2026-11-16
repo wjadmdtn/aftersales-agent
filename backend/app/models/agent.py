@@ -8,6 +8,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from app.models.handoff import ToolStatus
+
 
 class Intent(StrEnum):
     """六个业务意图 + exchange 固定拒答 + unknown 兜底。
@@ -101,6 +103,9 @@ class PendingConfirmation(BaseModel):
     summary: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     expires_at: datetime
+    # 幂等键在弹确认时定稿，确认执行时复用。执行时才生成的话，
+    # 链路超时后重试会换一把新钥匙，业务侧按 request_id 的去重形同虚设。
+    request_id: str | None = None
 
 
 class SessionState(BaseModel):
@@ -117,6 +122,15 @@ class SessionState(BaseModel):
     # 政策检索：最近一次引用的条款（多轮追问用）与发生检索的轮次数（评测用）
     last_cited_clause_ids: list[str] = Field(default_factory=list)
     policy_turns: int = 0
+    # ---- 转人工触发信号（Feature 003 的 SYSTEM_ERROR / RISK 依赖它们）----
+    # 此前 SessionState 不存这些，detect() 永远拿到默认值，
+    # 于是"工具连续失败转人工""大额退款转人工"在生产链路上从不触发。
+    tool_failure_streak: int = 0
+    last_tool_status: ToolStatus | None = None
+    llm_timeout_streak: int = 0
+    schema_retries_exhausted: bool = False
+    # 待确认操作涉及的退款金额。转人工时用于判定是否达到风险阈值。
+    pending_refund_amount: Decimal | None = None
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 

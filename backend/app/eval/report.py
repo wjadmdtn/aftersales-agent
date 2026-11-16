@@ -50,18 +50,26 @@ def render_markdown(report: EvalReport) -> str:
     lines.append("")
 
     if report.backend == "stub":
-        lines.append("> ⚠ 本次使用**桩实现**，准确率不代表真实效果，**不可对外引用**。")
-        lines.append("> 对外数字请用 `--llm=real` 重新运行。")
+        lines.append("> ⚠ **桩实现，数字无意义**：桩按关键词匹配，只用于验证链路是否跑通")
+        lines.append("> （改了代码有没有把分支改坏），**不代表模型能力**。")
+        lines.append("> 下表只给通过条数，不给准确率——准确率请用 `--llm=real` 运行。")
         lines.append("")
-
-    lines.append("| 指标 | 结果 | 基线 | 变化 |")
-    lines.append("|---|---|---|---|")
-    for m in report.metrics:
-        passed_part = f" ({m.passed}/{m.total})" if m.passed is not None and m.total is not None else ""
-        base = _fmt(MetricLine(name=m.name, value=m.baseline)) if m.baseline is not None else "—"
-        delta = f"{m.delta:+.2f}" if m.delta is not None else "—"
-        lines.append(f"| {m.name} | {_fmt(m)}{passed_part} | {base} | {delta} |")
-    lines.append("")
+        lines.append("| 指标 | 通过 | 总数 |")
+        lines.append("|---|---|---|")
+        for m in report.metrics:
+            p = m.passed if m.passed is not None else "—"
+            t = m.total if m.total is not None else "—"
+            lines.append(f"| {m.name} | {p} | {t} |")
+        lines.append("")
+    else:
+        lines.append("| 指标 | 结果 | 基线 | 变化 |")
+        lines.append("|---|---|---|---|")
+        for m in report.metrics:
+            passed_part = f" ({m.passed}/{m.total})" if m.passed is not None and m.total is not None else ""
+            base = _fmt(MetricLine(name=m.name, value=m.baseline)) if m.baseline is not None else "—"
+            delta = f"{m.delta:+.2f}" if m.delta is not None else "—"
+            lines.append(f"| {m.name} | {_fmt(m)}{passed_part} | {base} | {delta} |")
+        lines.append("")
 
     if report.blocked:
         lines.append("### ❌ 回归阻断")

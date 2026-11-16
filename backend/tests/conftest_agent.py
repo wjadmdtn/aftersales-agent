@@ -65,6 +65,11 @@ async def env():
         "我要投诉": IntentResult(intent=Intent.UNKNOWN, confidence=0.9),
         "我想换个货": IntentResult(intent=Intent.EXCHANGE, confidence=0.9),
         "我想换个尺码": IntentResult(intent=Intent.EXCHANGE, confidence=0.9),
+        "我要改地址": IntentResult(intent=Intent.CHANGE_ADDRESS, confidence=0.9),
+        "我要改成别的地址": IntentResult(intent=Intent.CHANGE_ADDRESS, confidence=0.9),
+        "改为北京市朝阳区建国路4号 13800138000": IntentResult(
+            intent=Intent.CHANGE_ADDRESS, confidence=0.9
+        ),
     }
     stub = StubLLMClient(responses)
     classifier = IntentClassifier(stub, keyword_map={})

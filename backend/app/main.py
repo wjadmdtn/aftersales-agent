@@ -141,6 +141,9 @@ async def lifespan(app: FastAPI):
             await get_chat().close()
         except RuntimeError:
             pass
+        # LLM 客户端持有长活连接池，不关会随重载泄漏
+        if hasattr(llm, "aclose"):
+            await llm.aclose()
         await redis.aclose()
         reset_chat()
 
