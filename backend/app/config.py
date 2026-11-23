@@ -132,13 +132,12 @@ class Settings(BaseSettings):
 
     handoff_scripts_raw: str = Field(
         default="""{
-  "user_request": "好的，正在为您接入人工客服，请稍候。",
-  "risk": "非常抱歉给您带来了不好的体验，已为您优先接入人工客服，请稍候。",
-  "system_error": "抱歉，系统这边出了点状况，已为您接入人工客服协助处理，请稍候。",
-  "boundary": "这个问题我这边没能处理，已为您接入人工客服，请稍候。",
+  "user_request": "正在为您转接人工，请稍候。",
+  "risk": "正在为您转接人工，请稍候。",
+  "system_error": "正在为您转接人工，请稍候。",
+  "boundary": "正在为您转接人工，请稍候。",
   "queued_followup": "正在为您接入人工客服，请稍候～",
-  "queued_ask_time": "正在为您排队接入人工客服，接通的瞬间会自动通知您～",
-  "declined": "非常抱歉，这个问题需要升级到专员为您跟进，稍后会有同事联系您。"
+  "queued_ask_time": "正在为您排队接入人工客服，接通的瞬间会自动通知您～"
 }"""
     )
 

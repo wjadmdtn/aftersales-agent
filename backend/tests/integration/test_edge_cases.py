@@ -31,7 +31,7 @@ def test_queued_user_message_does_not_consume_llm(http, ws_user):
     ws.recv_until("session.state")
     ws.send({"type": "user.message", "payload": {"text": "我还要改地址"}})
     done = ws.recv_until("assistant.done")
-    assert "正在为您接入" in done["payload"]["text"]
+    assert "转接人工" in done["payload"]["text"]
 
 
 def test_two_agents_concurrent_accept(http, ws_user):

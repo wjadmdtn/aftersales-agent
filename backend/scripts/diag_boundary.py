@@ -5,7 +5,6 @@ import os
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 
 from app.agent.llm.openai_compat import OpenAICompatLLMClient  # noqa: E402
-from app.config import settings  # noqa: E402
 from app.services.policy import build_policy_service  # noqa: E402
 
 CASES = ["能合并订单发货吗", "退款多久到账", "吊牌被剪了还能退吗"]

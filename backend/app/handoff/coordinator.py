@@ -61,6 +61,30 @@ class HandoffCoordinator:
         )
         return triggers.evaluate(signals, self.cfg)
 
+    def detect_system_error(
+        self,
+        *,
+        user_message: str,
+        last_tool_status: ToolStatus | None = None,
+        tool_failure_streak: int = 0,
+        llm_timeout_streak: int = 0,
+        schema_retries_exhausted: bool = False,
+    ) -> TriggerResult:
+        """只判系统异常，不让 user_request / risk 抢先命中。
+
+        AgentLoop 判断"是否因系统持续异常而转人工"时必须用这个：
+        走完整 evaluate 的话，用户消息里带一个"投诉"就会被 RISK 抢先返回，
+        系统已经连续失败也永远等不到转人工。
+        """
+        signals = TurnSignals(
+            user_message=user_message,
+            last_tool_status=last_tool_status,
+            tool_failure_streak=tool_failure_streak,
+            llm_timeout_streak=llm_timeout_streak,
+            schema_retries_exhausted=schema_retries_exhausted,
+        )
+        return triggers.check_system_error(signals, self.cfg)
+
     async def initiate(
         self,
         *,
@@ -127,16 +151,16 @@ class HandoffCoordinator:
             events=["accepted"],
         )
 
-    async def human_decline(self, session_id: str) -> HandoffOutcome | None:
-        ctx = await self.queue.decline(session_id)
+    async def human_transfer(self, session_id: str) -> HandoffOutcome | None:
+        ctx = await self.queue.requeue(session_id)
         if ctx is None:
             return None
-        # 拒绝后状态停在 HUMAN_SERVING，由上级处理；不回流给 AI
+        # 转接即回到排队，等另一位在线客服接入；不回流给 AI，也不结束会话。
         return HandoffOutcome(
-            reply=self.cfg.handoff_scripts["declined"],
-            state=HandoffState.HUMAN_SERVING,
+            reply=self.cfg.handoff_scripts["queued_followup"],
+            state=HandoffState.QUEUED,
             trigger_type=ctx.trigger_type,
-            events=["declined", "escalated"],
+            events=["transferred", "queued"],
         )
 
     async def resolve(self, session_id: str) -> None:

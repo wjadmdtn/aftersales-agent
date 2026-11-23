@@ -159,7 +159,7 @@ async def test_manual_handoff_intent(chat):
     r = await chat("转人工")
     assert r["intent"] == Intent.MANUAL
     assert r["state"] == "handoff_queued"
-    assert "人工客服" in r["reply"]
+    assert "转接人工" in r["reply"]
 
 
 async def test_complaint_does_not_trigger_action(chat, env):

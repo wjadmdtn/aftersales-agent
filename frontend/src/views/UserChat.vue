@@ -6,7 +6,7 @@ import HandoffBar from '@/components/HandoffBar.vue'
 import { Socket, type ConnState } from '@/ws/socket'
 import { mergeMessages } from '@/ws/merge'
 import { api } from '@/api/rest'
-import type { ChatMessage, Envelope, PendingAssistant, UiState } from '@/types'
+import type { ChatMessage, ConfirmCard, Envelope, PendingAssistant, UiState } from '@/types'
 
 const route = useRoute()
 
@@ -39,6 +39,20 @@ const handoffSent = ref(false)
 const conn = ref<ConnState>('connecting')
 const input = ref('')
 const notice = ref('')
+// 待确认卡：只能通过卡片上的按钮确认/取消，不解析自由文本
+const confirmCard = ref<ConfirmCard | null>(null)
+const confirming = ref(false)
+// 这些终态意味着确认卡已了结，可以移除了
+const CONFIRM_ENDED = new Set([
+  'executed',
+  'cancelled',
+  'write_rejected',
+  'execute_failed',
+  'execute_uncertain',
+  'expired',
+  'no_pending',
+  'stale_card',
+])
 
 let socket: Socket | null = null
 let lastLocalId: string | null = null
@@ -54,7 +68,11 @@ function ensureIds() {
 }
 
 const inputDisabled = computed(
-  () => uiState.value === 'queued' || uiState.value === 'resolved',
+  () =>
+    uiState.value === 'queued' ||
+    uiState.value === 'resolved' ||
+    // AI 正在回复（含等待模型返回）：这一条没回完，不允许再发
+    pending.value !== null,
 )
 
 // 后端在「要改地址」时回 need_address，这里弹出结构化表单。
@@ -110,6 +128,7 @@ const placeholder = computed(() => {
   if (idleExpired.value) return '会话已结束，发送消息可开始新会话'
   if (uiState.value === 'queued') return '正在为您接入，请稍候'
   if (uiState.value === 'resolved') return '会话已结束'
+  if (pending.value) return 'AI 正在回复，请稍候…'
   return '输入消息…'
 })
 
@@ -135,6 +154,10 @@ function handleFrame(env: Envelope<any>) {
   switch (env.type) {
     case 'session.state':
       applyState(env.payload)
+      if (uiState.value !== 'ai_serving') {
+        confirmCard.value = null
+        confirming.value = false
+      }
       break
     case 'user.message.ack': {
       const localId = env.payload.local_id as string | undefined
@@ -164,6 +187,8 @@ function handleFrame(env: Envelope<any>) {
       degraded.value = Boolean(p.degraded)
       // 后端阶段名（need_address 等）驱动表单展示
       agentState.value = p.state ?? null
+      confirming.value = false
+      if (CONFIRM_ENDED.has(String(p.state ?? ''))) confirmCard.value = null
       const msg: ChatMessage = {
         id: p.msg_id,
         session_id: env.session_id ?? sessionId.value,
@@ -182,6 +207,11 @@ function handleFrame(env: Envelope<any>) {
     case 'human.message': {
       const msg = env.payload as ChatMessage
       messages.value = mergeMessages(messages.value, [msg]).messages
+      break
+    }
+    case 'confirm.card': {
+      confirmCard.value = env.payload as unknown as ConfirmCard
+      confirming.value = false
       break
     }
     case 'error': {
@@ -239,11 +269,14 @@ async function boot() {
 
   // 每次进入，若本次会话还没有任何消息，AI 先打招呼。
   // 超时重开也走这里——用户看到的是一致的"开场"。
-  if (!messages.value.length) messages.value = [greetingMessage()]
+  // 是否新会话要在插入问候语之前判定：问候语会让 messages 非空，
+  // 之后再判长度会把 order_id 永远挡在握手之外。
+  const isNewSession = !messages.value.length
+  if (isNewSession) messages.value = [greetingMessage()]
   resetIdleTimer()
 
   const params = new URLSearchParams({ session_id: sessionId.value, user_id: userId.value })
-  if (!messages.value.length && orderId.value) params.set('order_id', orderId.value)
+  if (isNewSession && orderId.value) params.set('order_id', orderId.value)
 
   socket = new Socket({
     path: `/ws/chat?${params.toString()}`,
@@ -311,6 +344,15 @@ function quickHandoff() {
   socket.send({ type: 'user.handoff', payload: {} })
 }
 
+function decide(decision: 'confirm' | 'cancel') {
+  if (!socket || !confirmCard.value || confirming.value) return
+  confirming.value = true
+  socket.send({
+    type: 'user.confirm',
+    payload: { card_id: confirmCard.value.card_id, decision },
+  })
+}
+
 onMounted(boot)
 onBeforeUnmount(() => {
   clearTimeout(idleTimer)
@@ -351,6 +393,25 @@ onBeforeUnmount(() => {
 
     <div v-if="idleNotice" class="notice notice--idle" data-test="idle-ended">{{ idleNotice }}</div>
     <div v-if="notice" class="notice">{{ notice }}</div>
+
+    <div v-if="confirmCard" class="confirm-card" data-test="confirm-card">
+      <p class="confirm-card__summary">{{ confirmCard.summary }}</p>
+      <div class="confirm-card__actions">
+        <el-button
+          type="primary"
+          size="small"
+          :loading="confirming"
+          :disabled="confirming"
+          data-test="confirm-ok"
+          @click="decide('confirm')"
+        >
+          确认
+        </el-button>
+        <el-button size="small" :disabled="confirming" data-test="confirm-cancel" @click="decide('cancel')">
+          取消
+        </el-button>
+      </div>
+    </div>
 
     <form
       v-if="showAddressForm"
@@ -430,6 +491,21 @@ header {
   padding: 6px 16px;
   font-size: 13px;
   color: #909399;
+}
+.confirm-card {
+  margin: 0 16px 12px;
+  padding: 12px 16px;
+  border: 1px solid #dcdfe6;
+  border-radius: 8px;
+  background: #fafafa;
+}
+.confirm-card__summary {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+.confirm-card__actions {
+  display: flex;
+  gap: 8px;
 }
 footer {
   display: flex;

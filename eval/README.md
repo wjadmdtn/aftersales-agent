@@ -1,6 +1,6 @@
 # 评测
 
-220 条用例，按**处理路径**分类判分，而不是只分对错。
+299 条用例，按**处理路径**分类判分，而不是只分对错。
 
 ## 跑法
 
@@ -26,17 +26,16 @@ python eval/runner.py --llm=real --model=deepseek-v4-flash --concurrency=12
 
 ## 用例分布
 
-| 路径 | 类别 | 条数 |
-|---|---|---|
-| business_action | standard | 55 |
-| business_action | adversarial | 30 |
-| business_action | no_keyword | 20 |
-| clarify | with_emotion | 25 |
-| clarify | no_emotion | 15 |
-| handoff | 四类触发源 | 30 |
-| irrelevant | — | 20 |
-| e2e | 多轮流程 | 25 |
-| **合计** | | **220** |
+用例按文件组织，各类条数以 `eval/cases/*.jsonl` 为准：
+
+| 文件 | 条数 |
+|---|---|
+| `clarify.jsonl` | 60 |
+| `e2e.jsonl` | 61 |
+| `handoff.jsonl` | 30 |
+| `intent.jsonl` | 113 |
+| `policy.jsonl` | 35 |
+| **合计** | **299** |
 
 改用例请改 `seeds/*.py` 后跑 `python eval/generate.py`，不要手改 JSONL。
 

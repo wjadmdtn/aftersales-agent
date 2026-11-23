@@ -88,10 +88,14 @@ def test_accepted_session_appears_in_my_sessions(http, ws_user):
     assert others == []
 
 
-def test_decline_removes_from_queue_and_keeps_human_state(http, ws_user):
+def test_transfer_returns_session_to_queue(http, ws_user):
     _queued(http, ws_user)
-    http.post("/handoff/decline", json={"session_id": "s1", "agent_id": "demo-agent"})
+    http.post("/handoff/accept", json={"session_id": "s1", "agent_id": "demo-agent"})
     assert http.get("/handoff/queue").json()["depth"] == 0
+
+    http.post("/handoff/transfer", json={"session_id": "s1", "agent_id": "demo-agent"})
+    assert http.get("/handoff/queue").json()["depth"] == 1
     body = http.get("/chat/session/s1").json()
-    # 拒绝不回流 AI（状态机刻意没有 HUMAN_SERVING -> NORMAL）
-    assert body["state"]["state"] == "human_serving"
+    # 转接不结束会话、不回流 AI：回到排队，归属清空，等其他客服接入
+    assert body["state"]["state"] == "queued"
+    assert body["state"]["agent_id"] is None

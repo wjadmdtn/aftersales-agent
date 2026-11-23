@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT / "backend") not in sys.path:
     sys.path.insert(0, str(ROOT / "backend"))
 
-from app.policy.embedder import BgeEmbedder, cosine  # noqa: E402
+from app.policy.embedder import BgeEmbedder  # noqa: E402
 from app.policy.seed import load_policies  # noqa: E402
 from app.policy.store import InMemoryClauseStore  # noqa: E402
 

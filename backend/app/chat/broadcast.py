@@ -12,7 +12,6 @@ from typing import Any, Callable
 
 from app.chat.protocol import MessageType, Role, UI_STATE_OF, envelope
 from app.chat.runtime import get_chat
-from app.config import settings
 from app.models.handoff import HandoffState, TriggerResult, TriggerType
 
 logger = logging.getLogger(__name__)
@@ -145,24 +144,21 @@ async def on_queue_accepted(session_id: str, agent_id: str, agent_name: str) -> 
     await broadcast_queue_update(removed=[session_id])
 
 
-async def on_queue_declined(session_id: str) -> None:
-    """拒绝后状态停在 HUMAN_SERVING（由上级处理），不回流给 AI。"""
+async def on_queue_transferred(session_id: str) -> None:
+    """人工转接：释放归属，回到排队，等另一位在线客服接入。
+
+    不允许人工"拒绝"——那会让会话既不在队列、又没人服务。转接把会话还给队列。
+    """
     rt = get_chat()
-    state = await rt.registry.get(session_id)
-    if state is None:
+    try:
+        await rt.registry.release_to_queue(session_id)
+    except KeyError:
         return
-    if state.state is HandoffState.QUEUED:
-        await rt.registry.set_state(session_id, HandoffState.HUMAN_SERVING)
     await broadcast_state(session_id)
-    await broadcast_queue_update(removed=[session_id])
+    await broadcast_queue_update(added=[session_id])
 
 
 async def on_resolved(session_id: str) -> None:
     rt = get_chat()
     await rt.registry.set_state(session_id, HandoffState.RESOLVED)
     await broadcast_state(session_id)
-
-
-
-DEFAULT_AGENT_ID = settings.demo_agent_id
-DEFAULT_AGENT_NAME = settings.demo_agent_name

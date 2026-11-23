@@ -308,7 +308,9 @@ class OpenAICompatLLMClient:
             )
             resp.raise_for_status()
             return resp.json()["choices"][0]["message"]["content"]
-        except (httpx.HTTPError, KeyError, IndexError, TypeError) as e:
+        except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError) as e:
+            # ValueError 包含 JSONDecodeError：200 但 body 非 JSON（网关错误页/截断）
+            # 必须归成"模型不可用"，否则会绕过 with_retry 直接 500，而不是降级。
             raise LLMError(f"llm call failed: {e}", status=_http_status(e)) from e
 
     async def rerank_policy(
@@ -357,7 +359,7 @@ class OpenAICompatLLMClient:
             )
             resp.raise_for_status()
             content = resp.json()["choices"][0]["message"]["content"]
-        except (httpx.HTTPError, KeyError, IndexError) as e:
+        except (httpx.HTTPError, KeyError, IndexError, ValueError) as e:
             raise LLMError(f"llm rerank call failed: {e}", status=_http_status(e)) from e
 
         try:
@@ -401,7 +403,7 @@ class OpenAICompatLLMClient:
             )
             resp.raise_for_status()
             content = resp.json()["choices"][0]["message"]["content"]
-        except (httpx.HTTPError, KeyError, IndexError) as e:
+        except (httpx.HTTPError, KeyError, IndexError, ValueError) as e:
             raise LLMError(f"llm policy call failed: {e}", status=_http_status(e)) from e
 
         try:

@@ -82,13 +82,18 @@ async def _on_handoff(session_id: str, outcome_state) -> None:
     """
     from app.chat.broadcast import broadcast_queue_update, broadcast_state
     from app.chat.runtime import get_chat
+    from app.handoff.state import IllegalTransition
 
     rt = get_chat()
     try:
-        await rt.registry.set_state(session_id, outcome_state)
+        await rt.registry.set_state(session_id, outcome_state, actor="agent")
     except KeyError:
         await rt.registry.ensure(session_id, user_id="unknown")
-        await rt.registry.set_state(session_id, outcome_state)
+        await rt.registry.set_state(session_id, outcome_state, actor="agent")
+    except (ValueError, IllegalTransition):
+        # 会话已结束或当前状态不允许迁移：状态同步跳过，不让整轮对话 500
+        logger.warning("handoff state sync skipped session=%s", session_id)
+        return
     await broadcast_state(session_id)
     await broadcast_queue_update(added=[session_id])
 

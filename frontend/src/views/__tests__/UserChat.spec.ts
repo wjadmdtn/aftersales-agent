@@ -304,3 +304,112 @@ describe('UserChat 地址表单', () => {
     expect(w.find('[data-test="address-form"]').exists()).toBe(false)
   })
 })
+
+describe('UserChat 订单上下文', () => {
+  it('新会话从订单页带入的 order_id 随握手传给后端', async () => {
+    const r = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/chat', name: 'chat', component: UserChat }],
+    })
+    await r.push('/chat?order_id=ORD1002')
+    mount(UserChat, { global: { ...global, plugins: [r] } })
+    await flushPromises()
+
+    const sock = (await import('@/ws/socket')).Socket as any
+    const inst = sock.instances[sock.instances.length - 1]
+    expect(inst.opts.path).toContain('order_id=ORD1002')
+  })
+})
+
+describe('UserChat 确认卡', () => {
+  async function latestSocket() {
+    const sock = (await import('@/ws/socket')).Socket as any
+    return sock.instances[sock.instances.length - 1]
+  }
+
+  function emitCard(inst: any) {
+    inst.opts.onFrame({
+      type: 'confirm.card',
+      session_id: 's1',
+      seq: 0,
+      ts: new Date().toISOString(),
+      payload: {
+        card_id: 'confirm-abc',
+        action: 'refund',
+        order_id: 'ORD1002',
+        amount: '259.90',
+        summary: '即将为订单 ORD1002 提交退款 259.90 元，确认吗？',
+        expires_at: new Date().toISOString(),
+      },
+    })
+  }
+
+  it('收到确认卡显示按钮，点确认只发 user.confirm 不重发文本', async () => {
+    const w = await mountChat()
+    const inst = await latestSocket()
+    emitCard(inst)
+    await flushPromises()
+
+    expect(w.find('[data-test="confirm-card"]').exists()).toBe(true)
+    await w.find('[data-test="confirm-ok"]').trigger('click')
+
+    const sent = inst.sent.filter((f: any) => f.type === 'user.confirm')
+    expect(sent).toHaveLength(1)
+    expect(sent[0].payload).toEqual({ card_id: 'confirm-abc', decision: 'confirm' })
+  })
+
+  it('点取消发出 decision=cancel', async () => {
+    const w = await mountChat()
+    const inst = await latestSocket()
+    emitCard(inst)
+    await flushPromises()
+
+    await w.find('[data-test="confirm-cancel"]').trigger('click')
+    const sent = inst.sent.filter((f: any) => f.type === 'user.confirm')
+    expect(sent[0].payload).toEqual({ card_id: 'confirm-abc', decision: 'cancel' })
+  })
+
+  it('执行完成后卡片消失', async () => {
+    const w = await mountChat()
+    const inst = await latestSocket()
+    emitCard(inst)
+    await flushPromises()
+    expect(w.find('[data-test="confirm-card"]').exists()).toBe(true)
+
+    inst.opts.onFrame({
+      type: 'assistant.done',
+      session_id: 's1',
+      seq: 3,
+      ts: new Date().toISOString(),
+      payload: { msg_id: 'm2', seq: 3, text: '已为您提交退款', state: 'executed' },
+    })
+    await flushPromises()
+    expect(w.find('[data-test="confirm-card"]').exists()).toBe(false)
+  })
+})
+
+describe('UserChat 回复中禁用输入', () => {
+  it('发送后到回复前输入禁用，回复后恢复', async () => {
+    const w = await mountChat()
+    const sock = (await import('@/ws/socket')).Socket as any
+    const inst = sock.instances[sock.instances.length - 1]
+    const input = () => w.find('[data-test="chat-input"]')
+
+    expect((input().element as HTMLInputElement).disabled).toBe(false)
+
+    await input().setValue('我要退款')
+    await w.find('[data-test="chat-send"]').trigger('click')
+    await flushPromises()
+    expect((input().element as HTMLInputElement).disabled).toBe(true)
+
+    inst.opts.onFrame({
+      type: 'assistant.done',
+      session_id: 's1',
+      seq: 2,
+      ts: new Date().toISOString(),
+      payload: { msg_id: 'm1', seq: 2, text: '好的', state: 'done' },
+    })
+    await flushPromises()
+    expect((input().element as HTMLInputElement).disabled).toBe(false)
+  })
+})

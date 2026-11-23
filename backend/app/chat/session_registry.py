@@ -9,6 +9,7 @@ from __future__ import annotations
 from redis.asyncio import Redis
 
 from app.chat.protocol import ChatState, utcnow
+from app.handoff.state import assert_transition
 from app.models.handoff import HandoffState
 
 STATE_KEY = "chat:state:{sid}"
@@ -56,12 +57,15 @@ class SessionRegistry:
         *,
         agent_id: str | None = None,
         agent_name: str | None = None,
+        actor: str = "human",
     ) -> ChatState:
         st = await self.get(session_id)
         if st is None:
             raise KeyError(session_id)
         if st.state is HandoffState.RESOLVED:
             raise ValueError(f"会话已解决，不能再迁移：{session_id}")
+        # 状态机硬约束：非法迁移（如跳过 queue、人工服务中回流 AI）在这里就挡住
+        assert_transition(st.state, HandoffState(state), actor=actor)
         st.state = HandoffState(state)
         if agent_id is not None:
             st.agent_id = agent_id
@@ -160,3 +164,18 @@ class SessionRegistry:
 
     async def release_claim(self, session_id: str) -> None:
         await self.redis.delete(CLAIM_KEY.format(sid=session_id))
+
+    async def release_to_queue(self, session_id: str) -> ChatState:
+        """人工转接：放掉抢锁与归属，回到排队状态，等另一位客服接入。"""
+        st = await self.get(session_id)
+        if st is None:
+            raise KeyError(session_id)
+        if st.agent_id:
+            await self.redis.srem(AGENT_INDEX.format(aid=st.agent_id), session_id)
+        await self.release_claim(session_id)
+        assert_transition(st.state, HandoffState.QUEUED, actor="human")
+        st.state = HandoffState.QUEUED
+        st.agent_id = None
+        st.agent_name = None
+        st.updated_at = utcnow()
+        return await self._save(st)

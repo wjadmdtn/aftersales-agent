@@ -254,3 +254,10 @@ def test_inmemory_store_category_filter(store):
     )
     assert res.candidates
     assert all(c.clause.category == "logistics" for c in res.candidates)
+
+
+def test_second_candidate_uses_vector_score_not_fused_order():
+    """关键词融合会把低向量分条款顶到第二位；gap 必须按"向量第二高"算，
+    否则 0.80/0.79 这种近分会被误判成不歧义。"""
+    res = _run([0.80, 0.70, 0.79], 0.6, 0.05)
+    assert res.decision is RetrievalDecision.AMBIGUOUS

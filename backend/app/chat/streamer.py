@@ -121,6 +121,18 @@ async def _yield_once() -> None:
 
 
 async def handle_user_message(conn: Connection, frame: Envelope) -> None:
+    """用户消息入口：同一会话串行处理，避免并发相互覆盖会话状态。
+
+    单条 WS 连接本来就是顺序读帧；这里防的是多连接（重连 / 多标签页）同时给
+    同一会话发消息——两轮并发 get-modify-save 会丢更新，确认场景还可能重复执行。
+    """
+    session_id = conn.session_id
+    assert session_id is not None
+    async with get_chat().session_lock(session_id):
+        await _handle_user_message(conn, frame)
+
+
+async def _handle_user_message(conn: Connection, frame: Envelope) -> None:
     session_id = conn.session_id
     assert session_id is not None
     rt = get_chat()
@@ -221,6 +233,20 @@ async def handle_user_message(conn: Connection, frame: Envelope) -> None:
         await _forward_to_human(conn, session_id, user_msg)
         return
 
+    # 待确认卡只能点按钮：文本"确认/取消"不再直接执行（旧文本入口只留给 /agent/chat 与评测）。
+    from app.agent.confirm import is_cancellation, is_confirmation
+    from app.api.agent_routes import get_loop
+
+    pending = await get_loop().sessions.get_pending(session_id)
+    if pending is not None and (is_confirmation(text) or is_cancellation(text)):
+        await stream_reply(
+            conn,
+            session_id,
+            "请点击卡片上的「确认」或「取消」按钮完成操作。",
+            meta={"state": "awaiting_confirmation"},
+        )
+        return
+
     await _run_agent(conn, session_id, text)
 
 
@@ -275,6 +301,8 @@ async def _run_agent(conn: Connection, session_id: str, text: str) -> None:
             "degraded": reply.source.value == "degraded",
         },
     )
+    if reply.card:
+        _send_card(conn, session_id, reply.card)
 
     # 会话过程中可能需要把新绑定的订单同步到 ChatState（用户消息里出现新订单号）
     if state is not None:
@@ -310,6 +338,14 @@ async def handle_user_handoff(conn: Connection, frame: Envelope) -> None:
 
 
 async def handle_user_address(conn: Connection, frame: Envelope) -> None:
+    """地址表单提交。与消息处理共用会话锁，避免和进行中的一轮并发。"""
+    session_id = conn.session_id
+    assert session_id is not None
+    async with get_chat().session_lock(session_id):
+        await _handle_user_address(conn, frame)
+
+
+async def _handle_user_address(conn: Connection, frame: Envelope) -> None:
     """地址表单提交。
 
     地址只认表单给的结构化字段，不做自由文本解析：从"改到朝阳区建国路4号"
@@ -382,6 +418,68 @@ async def handle_user_address(conn: Connection, frame: Envelope) -> None:
             "tool_calls": reply.tool_calls,
         },
     )
+    if reply.card:
+        _send_card(conn, session_id, reply.card)
+
+
+async def handle_user_confirm(conn: Connection, frame: Envelope) -> None:
+    """确认卡按钮：只认 card_id，不接受自由文本。"""
+    from app.api.agent_routes import get_loop
+    from app.observability.trace import new_trace_id
+
+    session_id = conn.session_id
+    assert session_id is not None
+    payload = frame.payload or {}
+    card_id = str(payload.get("card_id", "")).strip()
+    decision = str(payload.get("decision", "")).strip()
+    if not card_id or decision not in ("confirm", "cancel"):
+        conn.send(
+            envelope(
+                MessageType.ERROR,
+                session_id=session_id,
+                payload={"code": "bad_confirm", "message": "确认请求无效", "retryable": False},
+            )
+        )
+        return
+
+    async with get_chat().session_lock(session_id):
+        trace_id = new_trace_id()
+        try:
+            reply = await get_loop().confirm_pending(
+                session_id=session_id,
+                user_id=conn.user_id or "u",
+                card_id=card_id,
+                decision=decision,
+                trace_id=trace_id,
+            )
+        except Exception:
+            logger.exception("confirm pending failed session=%s", session_id)
+            conn.send(
+                envelope(
+                    MessageType.ERROR,
+                    session_id=session_id,
+                    payload={"code": "server_busy", "message": "系统繁忙，请重试", "retryable": True},
+                )
+            )
+            return
+
+        await stream_reply(
+            conn,
+            session_id,
+            reply.reply,
+            meta={
+                "intent": reply.intent.value if reply.intent else None,
+                "state": reply.state,
+                "tool_calls": reply.tool_calls,
+                "trace_id": trace_id,
+            },
+        )
+        if reply.card:
+            _send_card(conn, session_id, reply.card)
+
+
+def _send_card(conn: Connection, session_id: str, card: dict) -> None:
+    conn.send(envelope(MessageType.CONFIRM_CARD, session_id=session_id, payload=card))
 
 
 async def handle_agent_message(conn: Connection, frame: Envelope) -> None:

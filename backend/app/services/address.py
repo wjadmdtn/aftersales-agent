@@ -14,15 +14,6 @@ EDITABLE_STATES = {
     OrderStatus.PAID,
 }
 
-_EMPTY_HINT = {
-    "receiver": "收件人",
-    "phone": "联系电话",
-    "province": "省",
-    "city": "市",
-    "district": "区县",
-    "detail": "详细地址",
-}
-
 
 async def update_address(
     store: MemoryStore,
@@ -49,7 +40,3 @@ async def update_address(
 
         updated = store.update_address(order_id, address)
     return ok(updated, meta)
-
-
-def incomplete_address_hint(field: str) -> str:
-    return f"地址缺少{_EMPTY_HINT.get(field, field)}"

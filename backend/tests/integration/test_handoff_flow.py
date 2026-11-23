@@ -37,7 +37,7 @@ async def test_user_request_flow(coord):
     out = await _init(coord, "转人工")
     assert out.trigger_type is TriggerType.USER_REQUEST
     assert out.state is HandoffState.QUEUED
-    assert "接入人工客服" in out.reply
+    assert "转接人工" in out.reply
 
 
 async def test_user_request_has_no_retention_script(coord):
@@ -52,7 +52,7 @@ async def test_risk_priority_is_high(coord):
     ctx = await coord.queue.get_pack("s1")
     assert ctx.priority is Priority.HIGH
     assert ctx.suggested_next_step is None, "风险触发不给 AI 建议"
-    assert "优先" in out.reply
+    assert out.reply == settings.handoff_scripts["risk"]
 
 
 async def test_risk_skips_self_service(coord):
@@ -99,15 +99,14 @@ async def test_ai_cannot_initiate_handoff_while_human_serving(coord):
         )
 
 
-async def test_decline_does_not_return_to_ai(coord):
-    """FR-022：人工拒绝不得回流 AI。"""
+async def test_transfer_requeues_to_queue(coord):
+    """人工不允许拒绝：转接后回到排队，等另一位客服接入。"""
     await _init(coord, "转人工")
     await coord.human_accept("s1")
-    out = await coord.human_decline("s1")
+    out = await coord.human_transfer("s1")
 
-    assert out.state is HandoffState.HUMAN_SERVING, "拒绝后仍由人工侧处理，不回 AI"
-    assert "escalated" in out.events
-    assert "升级" in out.reply
+    assert out.state is HandoffState.QUEUED
+    assert "transferred" in out.events
 
 
 async def test_queued_followup_script(coord):

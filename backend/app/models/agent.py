@@ -38,15 +38,6 @@ class Intent(StrEnum):
     UNKNOWN = "unknown"
 
 
-# 只有这四个意图会映射到 mock 服务的业务能力
-ACTIONABLE_INTENTS = {
-    Intent.REFUND,
-    Intent.LOGISTICS,
-    Intent.CHANGE_ADDRESS,
-    Intent.QUERY_ORDER,
-    Intent.URGE_SHIPMENT,
-}
-
 # 会改变状态、必须确认的意图
 WRITE_INTENTS = {Intent.REFUND, Intent.CHANGE_ADDRESS}
 
@@ -71,7 +62,7 @@ class IntentMode(StrEnum):
 # 含这些词倾向 INQUIRY（疑问/假设）
 INQUIRY_MARKERS = ("吗", "能不能", "可不可以", "行不行", "如何", "怎么", "是否", "可以吗", "吗？")
 # 含这些词倾向 EXECUTE（祈使）
-EXECUTE_MARKERS = ("我要", "帮我", "麻烦", "请", "给我", "退了吧", "退了吧", "改成", "退了")
+EXECUTE_MARKERS = ("我要", "帮我", "麻烦", "请", "给我", "退了吧", "改成", "退了")
 
 
 class IntentSource(StrEnum):
@@ -121,8 +112,6 @@ class SessionState(BaseModel):
     intent: Intent | None = None
     turn_count: int = 0
     clarify_round: int = 0
-    # 最近一次政策检索的 top 相似度。跨轮保留，转人工时用它判断是否知识缺口。
-    last_rag_top_similarity: float | None = None
     # 政策检索：最近一次引用的条款（多轮追问用）与发生检索的轮次数（评测用）
     last_cited_clause_ids: list[str] = Field(default_factory=list)
     policy_turns: int = 0
@@ -136,8 +125,3 @@ class SessionState(BaseModel):
     # 待确认操作涉及的退款金额。转人工时用于判定是否达到风险阈值。
     pending_refund_amount: Decimal | None = None
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-
-def now() -> datetime:
-    return datetime.now(timezone.utc)

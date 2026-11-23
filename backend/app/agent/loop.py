@@ -22,7 +22,13 @@ from decimal import Decimal
 from typing import Any
 
 from app.agent import degrade, present
-from app.agent.confirm import Action, build_confirmation, is_cancellation, is_confirmation
+from app.agent.confirm import (
+    Action,
+    build_confirmation,
+    is_cancellation,
+    is_confirmation,
+    is_expired,
+)
 from app.agent.intent import IntentClassifier
 from app.agent.session import SessionStore, snapshot_mismatch
 from app.agent.tools.client import MockServiceClient
@@ -76,6 +82,8 @@ class AgentReply:
     tool_calls: list[str] = field(default_factory=list)
     state: str = "done"
     snapshot_mismatch: bool = False
+    # 待确认卡（退款/改地址）：前端据 card_id 渲染确认/取消按钮
+    card: dict | None = None
 
 
 class AgentLoop:
@@ -265,21 +273,23 @@ class AgentLoop:
         return self._note_tool(state, body)
 
     def _exhausted(self, state: SessionState, message: str) -> bool:
-        """是否已进入"该转人工"的异常状态。
+        """是否已进入"该因系统持续异常而转人工"的状态。
 
         只判系统级异常（失败次数/超时/structure），不判风险与边界——
         那两类各有自己的判定入口，混进来会让投诉词多走一遍兜底。
+        必须用 detect_system_error 而不是 detect：完整 evaluate 里 RISK 排在
+        SYSTEM_ERROR 前面，消息带"投诉"时会被抢先命中，系统异常就永远不生效。
         """
         if self.coordinator is None:
             return False
-        trigger = self.coordinator.detect(
+        trigger = self.coordinator.detect_system_error(
             user_message=message,
             last_tool_status=state.last_tool_status,
             tool_failure_streak=state.tool_failure_streak,
             llm_timeout_streak=state.llm_timeout_streak,
             schema_retries_exhausted=state.schema_retries_exhausted,
         )
-        return trigger.triggered and trigger.trigger_type is TriggerType.SYSTEM_ERROR
+        return trigger.triggered
 
     # ---------- 降级 ----------
 
@@ -454,15 +464,12 @@ class AgentLoop:
             retrieval,
         )
 
-    CLARIFY_ROUND_LIMIT = 2
-
     async def _clarify(
         self,
         state: SessionState,
         message: str,
         *,
         trace_id: str,
-        rag_top_similarity: float | None = None,
         comfort_only: bool = False,
     ) -> AgentReply:
         """诉求不明时的回应。
@@ -487,10 +494,6 @@ class AgentLoop:
         )
         from app.handoff.emotion import detect_emotion
         from app.models.handoff import Emotion
-
-        # 跨轮保留检索信号：后续若因别的条件转人工，还要用它判断是否知识缺口
-        if rag_top_similarity is not None:
-            state.last_rag_top_similarity = rag_top_similarity
 
         negative = detect_emotion(message) is not Emotion.NEUTRAL
 
@@ -882,7 +885,12 @@ class AgentLoop:
         )
         await self.sessions.set_pending(state.session_id, pending)
         state.pending_refund_amount = pending.amount
-        return AgentReply(reply=pending.summary, intent=intent, state="awaiting_confirmation")
+        return AgentReply(
+            reply=pending.summary,
+            intent=intent,
+            state="awaiting_confirmation",
+            card=_card_payload(pending),
+        )
 
     async def submit_address(
         self,
@@ -933,12 +941,18 @@ class AgentLoop:
             reply=pending.summary,
             intent=Intent.CHANGE_ADDRESS,
             state="awaiting_confirmation",
+            card=_card_payload(pending),
         )
 
     # ---------- 确认处理 ----------
     async def _handle_confirmation(
         self, state: SessionState, pending: PendingConfirmation, message: str, *, trace_id: str
     ) -> AgentReply:
+        """自由文本确认（内部 / 评测 legacy 路径）。
+
+        用户端（WebSocket）已改为**只能点按钮**：文本"确认"会在 streamer 层被拦下，
+        不会走到这里。这里保留给 /agent/chat 与评测用例，避免推翻既有用例。
+        """
         if is_cancellation(message):
             await self.sessions.clear_pending(state.session_id)
             state.pending_refund_amount = None
@@ -946,14 +960,57 @@ class AgentLoop:
 
         if not is_confirmation(message):
             return AgentReply(
-                reply=f"请您确认一下：{pending.summary}",
+                reply=f"请您点击卡片上的「确认」或「取消」按钮：{pending.summary}",
                 state="awaiting_confirmation",
             )
 
-        # 确认通过。执行前**始终**重新校验订单状态（FR-020）
         await self.sessions.clear_pending(state.session_id)
         state.pending_refund_amount = None
+        return await self._execute_pending(state, pending, trace_id=trace_id)
 
+    async def confirm_pending(
+        self,
+        *,
+        session_id: str,
+        user_id: str,
+        card_id: str,
+        decision: str,
+        trace_id: str,
+    ) -> AgentReply:
+        """按钮确认入口：只认卡片 id，不接受自由文本。
+
+        card_id 必须与当前待确认操作的 request_id 一致——防止旧卡片/伪造卡片
+        在用户没看到最新摘要时触发执行。
+        """
+        state = await self.sessions.get_or_create(session_id, user_id=user_id)
+        pending = await self.sessions.get_pending(session_id)
+        if pending is None:
+            return AgentReply(reply="这张确认卡已失效，请重新发起。", state="no_pending")
+        if card_id != pending.request_id:
+            return AgentReply(
+                reply="确认信息与当前待办不一致，请以最新一张卡片为准。",
+                state="stale_card",
+            )
+        if is_expired(pending):
+            await self.sessions.clear_pending(session_id)
+            state.pending_refund_amount = None
+            await self.sessions.save(state)
+            return AgentReply(reply="确认已超时，请重新发起。", state="expired")
+
+        await self.sessions.clear_pending(session_id)
+        state.pending_refund_amount = None
+        if decision == "cancel":
+            await self.sessions.save(state)
+            return AgentReply(reply="好的，已为您取消。", state="cancelled")
+
+        reply = await self._execute_pending(state, pending, trace_id=trace_id)
+        await self.sessions.save(state)
+        return reply
+
+    async def _execute_pending(
+        self, state: SessionState, pending: PendingConfirmation, *, trace_id: str
+    ) -> AgentReply:
+        """执行已确认的操作。调用方负责清 pending；执行前始终复核订单状态（FR-020）。"""
         if pending.action == Action.REFUND.value:
             check = await self._call(
                 lambda: self.tools.get_order(pending.order_id, trace_id=trace_id), state
@@ -987,8 +1044,7 @@ class AgentLoop:
             if body.get("_transport_error"):
                 # 结果未知不能说"已退款"，也不能说"没退"——两句话都可能骗用户
                 return AgentReply(
-                    reply="退款请求已发出，但暂时没拿到结果。请稍后在订单里确认，"
-                          "或点「转人工」让客服帮您核实。",
+                    reply="退款结果暂时未知，请稍后在订单里确认，或点「转人工」核实。",
                     tool_calls=["order.get", "refund.create"],
                     state="execute_uncertain",
                 )
@@ -1021,8 +1077,7 @@ class AgentLoop:
         )
         if body.get("_transport_error"):
             return AgentReply(
-                reply="地址修改请求已发出，但暂时没拿到结果。请稍后在订单里确认，"
-                      "或点「转人工」让客服帮您核实。",
+                reply="地址修改结果暂时未知，请稍后在订单里确认，或点「转人工」核实。",
                 tool_calls=["order.get", "address.update"],
                 state="execute_uncertain",
             )
@@ -1034,6 +1089,18 @@ class AgentLoop:
 
 
 EXCHANGE_WINDOW_DAYS = 7
+
+
+def _card_payload(pending: PendingConfirmation) -> dict:
+    """确认卡下发给前端的载荷。card_id 即 pending.request_id，按钮点击时原样回传。"""
+    return {
+        "card_id": pending.request_id,
+        "action": pending.action,
+        "order_id": pending.order_id,
+        "amount": str(pending.amount) if pending.amount is not None else None,
+        "summary": pending.summary,
+        "expires_at": pending.expires_at.isoformat(),
+    }
 
 
 def _urge_hint(status: str | None) -> str:

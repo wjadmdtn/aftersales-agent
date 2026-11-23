@@ -17,8 +17,6 @@ TRACE_ID_HEADER = "X-Trace-Id"
 trace_id_ctx: ContextVar[str] = ContextVar("trace_id", default="")
 fault_ctx: ContextVar[str | None] = ContextVar("fault_injected", default=None)
 
-_SHORT_CIRCUIT_PATHS = ("/docs", "/openapi.json", "/redoc")
-
 
 def new_trace_id() -> str:
     return uuid.uuid4().hex

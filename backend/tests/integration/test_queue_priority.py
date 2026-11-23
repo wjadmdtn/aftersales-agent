@@ -75,10 +75,13 @@ async def test_accept_removes(queue):
     assert await queue.depth() == 0
 
 
-async def test_decline_removes_and_does_not_requeue(queue):
+async def test_transfer_requeues(queue):
     await queue.enqueue(_ctx("s1", Priority.MEDIUM))
-    await queue.decline("s1")
+    await queue.accept("s1")
     assert await queue.depth() == 0
+    ctx = await queue.requeue("s1")
+    assert ctx is not None
+    assert await queue.depth() == 1, "转接后回到队列，等另一位客服接入"
 
 
 async def test_depth_by_priority(queue):

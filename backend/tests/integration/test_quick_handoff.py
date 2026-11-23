@@ -68,7 +68,7 @@ def test_message_while_queued_gets_waiting_script(http, ws_user):
 
     ws.send({"type": "user.message", "payload": {"text": "我要退款"}})
     done = ws.recv_until("assistant.done")
-    assert "正在为您接入" in done["payload"]["text"]
+    assert "转接人工" in done["payload"]["text"]
     # 不应出现"即将为订单…退款"这类业务应答
     assert "259.90" not in done["payload"]["text"]
 
@@ -98,4 +98,4 @@ def test_handoff_records_visible_message(http, ws_user):
     ws = _open(ws_user)
     ws.send({"type": "user.handoff", "payload": {}})
     done = ws.recv_until("assistant.done")
-    assert "人工客服" in done["payload"]["text"]
+    assert "转接人工" in done["payload"]["text"]

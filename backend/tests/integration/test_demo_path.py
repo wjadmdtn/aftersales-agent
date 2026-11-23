@@ -57,8 +57,19 @@ def test_demo_path_end_to_end(http, ws_user, ws_agent):
     assert "确认" in buf
     assert "哪一笔订单" not in buf, "不应追问订单号——订单已由入口带入"
 
-    # ---- ③ 确认 → 已提交 ----
-    user.send({"type": "user.message", "payload": {"text": "确认"}})
+    # ---- ③ 点确认按钮 → 已提交 ----
+    # 用户只能点按钮：先拿到服务端下发的确认卡，再用 card_id 发确认帧
+    card = None
+    for _ in range(5):
+        f = user.recv()
+        if f["type"] == "confirm.card":
+            card = f["payload"]
+            break
+    assert card is not None and card.get("card_id"), "没有收到确认卡"
+
+    user.send(
+        {"type": "user.confirm", "payload": {"card_id": card["card_id"], "decision": "confirm"}}
+    )
     done = user.recv_until("assistant.done")
     assert "已为您提交退款" in done["payload"]["text"]
 

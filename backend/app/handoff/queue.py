@@ -5,8 +5,6 @@ ZSET score：高优先级 score 更小，ZRANGE 自然把高优先级排前面�
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 from redis.asyncio import Redis
 
 from app.models.handoff import (
@@ -64,11 +62,17 @@ class HandoffQueue:
         await self.redis.delete(REQUESTED_KEY.format(sid=session_id))
         return ctx
 
-    async def decline(self, session_id: str) -> HandoffContext | None:
-        """人工拒绝：出队，但**不回流给 AI**。"""
+    async def requeue(self, session_id: str) -> HandoffContext | None:
+        """转接给其他在线客服：放回队列等待再次接入。
+
+        人工不允许"拒绝"——拒绝会让会话既不在队列、也没人服务，成为死会话。
+        转接只是把会话还给队列，由其他客服接手。
+        """
         ctx = await self.get_pack(session_id)
-        await self.redis.zrem(QUEUE_KEY, session_id)
-        await self.redis.delete(REQUESTED_KEY.format(sid=session_id))
+        if ctx is None:
+            return None
+        await self.redis.set(REQUESTED_KEY.format(sid=session_id), "1")
+        await self.redis.zadd(QUEUE_KEY, {session_id: self._score(ctx)})
         return ctx
 
     async def depth(self) -> int:

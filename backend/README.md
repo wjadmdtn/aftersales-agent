@@ -1,6 +1,8 @@
 # Aftersales Mock Service
 
-售后 Agent 依赖的 mock 业务服务。提供订单、物流、改地址、退款四个业务能力，以及**按请求维度生效的故障注入**——这是这个服务存在的意义：没有可控的故障，上层的降级与转人工能力无法被验证。
+售后 Agent 依赖的 mock 业务服务。提供订单、物流、退款、改地址、催发货五个业务能力，以及**按请求维度生效的故障注入**——这是这个服务存在的意义：没有可控的故障，上层的降级与转人工能力无法被验证。
+
+> Agent 对话、转人工、WebSocket 实时层、政策 RAG、评测等整体设计，见[仓库根 README](../README.md)。本文件只写 mock 业务服务本身。
 
 ## 快速开始
 
@@ -23,9 +25,11 @@ Windows 下跑测试需带 `PYTHONIOENCODING=utf-8`，否则控制台 GBK 编码
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
+| GET | `/health` | 健康检查 |
 | GET | `/orders/{order_id}` | 查订单 |
 | GET | `/orders/{order_id}/logistics` | 查物流 |
 | POST | `/orders/{order_id}/refund` | 发起退款（需 `X-Request-Id`） |
+| POST | `/orders/{order_id}/urge` | 催发货（需 `X-Request-Id`，同单时间窗去重） |
 | PUT | `/orders/{order_id}/address` | 改收货地址 |
 | GET | `/_debug/calls` | 查调用记录（`?trace_id=` 或 `?request_id=`） |
 
@@ -56,11 +60,11 @@ Windows 下跑测试需带 `PYTHONIOENCODING=utf-8`，否则控制台 GBK 编码
 | 1000 | OK | 成功 |
 | 2001 | ORDER_NOT_FOUND | 订单不存在 |
 | 2002 | LOGISTICS_NOT_FOUND | 该订单暂无物流信息 |
-| 2003 | REFUND_NOT_FOUND | 退款单不存在（预留） |
+| 2003 | REFUND_NOT_FOUND | 预留 |
 | 3001 | ORDER_STATUS_NOT_ALLOWED | 订单状态不允许该操作 |
 | 3002 | AMOUNT_EXCEEDS_ORDER | 退款金额超过订单金额 |
 | 3003 | AMOUNT_INVALID | 金额非法 |
-| 3004 | ADDRESS_INCOMPLETE | 地址字段缺失 |
+| 3004 | ADDRESS_INCOMPLETE | 预留（地址完整性当前由请求模型校验，非法入参返回 422） |
 | 3005 | ADDRESS_NOT_EDITABLE | 已发货不可改地址 |
 | 3006 | DUPLICATE_REQUEST | 幂等命中，返回首次结果（**业务上是成功的**） |
 | 4001 | INTERNAL_ERROR | 服务内部错误 |
@@ -71,17 +75,19 @@ Windows 下跑测试需带 `PYTHONIOENCODING=utf-8`，否则控制台 GBK 编码
 
 ## 幂等
 
-退款接口必须带 `X-Request-Id`。同一标识重复提交只产生一笔退款，后续请求返回 `3006` 和首次的 `refund_id`。
+退款与催发货必须带 `X-Request-Id`。同一标识重复提交只产生一次效果，后续请求返回 `3006` 和首次结果。
 
 ```
 用户说"我要退款"
-  → Agent 生成 request_id = "refund:ORD123:<uuid>"
+  → Agent 生成 request_id = "confirm:<uuid>"
   → 调用退款，超时
   → 重试，复用同一个 request_id
   → 服务端返回首次结果，不重复执行
 ```
 
 **谁负责重试，谁负责生成 request_id**——服务端生成的话，客户端超时后拿不到上次的值，幂等就失效了。
+
+催发货另有一层"同订单时间窗去重"（`MOCK_URGE_DEDUPE_WINDOW_S`，默认 1 小时）：用户连点会生成新 request_id，单靠幂等键挡不住。
 
 ## 链路追踪
 
@@ -126,7 +132,7 @@ curl "localhost:8000/orders/ORD1003" -H 'X-Fault: {"type":"dirty","field":"data.
 
 ## 配置
 
-全部走环境变量，见 `.env.example`。
+全部走环境变量，完整清单见 `.env.example`。mock 服务相关的主要项：
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
@@ -136,35 +142,42 @@ curl "localhost:8000/orders/ORD1003" -H 'X-Fault: {"type":"dirty","field":"data.
 | `MOCK_REFUND_LOCK_SHARDS` | `16` | 分段锁数量 |
 | `MOCK_CALL_RECORD_CAPACITY` | `10000` | 调用记录环形缓冲 |
 | `MOCK_DEBUG_ENDPOINTS_ENABLED` | `true` | `/_debug/*` 开关 |
+| `MOCK_URGE_DEDUPE_WINDOW_S` | `3600` | 同订单催单去重时间窗 |
 | `MOCK_LOG_LEVEL` | `INFO` | 日志级别 |
 
 ## 数据
 
 内存态 + 种子文件。启动时从 `seed/` 加载，运行中只改内存副本，**重启回到种子状态**。这是刻意的选择——保证评测每次从干净状态开始，结果可复现。
 
-种子包含 8 条订单，覆盖 7 种订单状态。
+种子包含 9 条订单，覆盖 7 种订单状态。
 
 ## 结构
 
 ```
 backend/
 ├── app/
-│   ├── models/        枚举、领域模型、响应信封
+│   ├── models/        枚举、领域模型、响应信封、Agent/转人工模型
 │   ├── observability/ 链路追踪、调用记录、日志
 │   ├── store/         种子加载、内存存储
 │   ├── faults/        故障规则、故障注入中间件
-│   ├── services/      四个业务能力
-│   └── api/           路由
-├── seed/orders.json
-└── tests/             88 个用例
+│   ├── services/      订单、物流、退款、改地址、催发货
+│   ├── api/           业务 + Agent + 转人工 + 聊天/WS 路由
+│   ├── agent/         Agent 主循环、意图识别、LLM 客户端
+│   ├── chat/          会话实时层（hub / streamer / 消息 / 限流）
+│   ├── handoff/       转人工（触发、队列、状态机、上下文包）
+│   ├── policy/        政策 RAG
+│   └── eval/          评测
+├── seed/
+└── tests/             unit / contract / integration / eval
 ```
 
 ## 测试
 
 ```
-tests/unit/         枚举、信封、故障规则、调用记录、存储
-tests/contract/     四个业务能力的接口契约
-tests/integration/  并发幂等、故障注入、链路传播
+tests/unit/         枚举、信封、故障规则、调用记录、存储、各业务单元
+tests/contract/     业务能力的接口契约
+tests/integration/  并发幂等、故障注入、链路传播、Agent/转人工/WS 全链路
+tests/eval/         评测 grader / baseline / 报告
 ```
 
 重点用例：
@@ -172,140 +185,3 @@ tests/integration/  并发幂等、故障注入、链路传播
 - `test_same_request_id_concurrent_produces_one_refund` — 50 并发只退一次
 - `test_different_request_ids_concurrent_only_one_succeeds` — 不同键并发只成功一笔
 - `test_retry_keeps_request_id_but_changes_trace` — attempt 1/2/3，trace 各不相同
-
----
-
-## Agent 接口（Feature 002）
-
-`POST /agent/chat`
-
-```json
-{
-  "session_id": "s1",
-  "user_id": "u1",
-  "message": "我要退款",
-  "order_id": "ORD1002",
-  "snapshot": {"name": "耳机", "amount": "259.90"}
-}
-```
-
-响应：
-
-```json
-{
-  "reply": "即将为订单 ORD1002 提交退款 259.90 元，确认吗？",
-  "intent": "refund",
-  "source": "llm",
-  "tool_calls": [],
-  "state": "awaiting_confirmation",
-  "trace_id": "a1b2..."
-}
-```
-
-### 意图识别：LLM 主导，关键词只作提示
-
-关键词只能说明"提到了"，不能说明"想干什么"：
-
-| 用户说 | 真实意图 |
-|---|---|
-| 我要退款 | 发起退款 |
-| 再不处理我就投诉你们不肯退款 | 威胁施压 |
-| 这个能退款吗 | 咨询可行性 |
-| 上次退款拖了半个月 | 陈述历史 |
-| 别再发退款短信了 | 反向表达 |
-| 钱什么时候能回来 | 想退款（无关键词） |
-
-因此 `collect_hints()` 只收集词，结果**完全由 LLM 决定**。`tests/unit/test_intent_parse.py` 里有一组测试专门断言 hints 不影响判定结果。
-
-### 降级：每次请求都先调 LLM，单次失败才降级
-
-不做熔断——熔断会在冷却期跳过 LLM，等于用关键词替代判断。
-
-```
-请求 → 调 LLM
-        ├─ 成功 → 正常路径
-        └─ 超时/报错/返回不合法 → 本次降级
-```
-
-降级时用**更宽的写操作词表**判断读写：命中即拒，未命中放行只读。"未命中"不等于"确认是读操作"，但误判后果被限制为多/少一次只读查询。
-
-### 写操作确认
-
-- 确认词**精确匹配**：`"确认不了"` 不算确认
-- 执行前**始终重新校验**订单状态，不管 pending 是否过期
-- 用户未说金额时按订单全额退款，金额取自库而非前端快照
-
-### 会话存储
-
-Redis，`session:{id}` TTL 24h，待确认操作单独存 `agent:pending:{id}`，TTL 5 分钟。
-
-### 测试
-
-```
-tests/unit/          80 个：意图解析、降级词表、确认、呈现、会话、桩
-tests/contract/      15 个：mock 服务接口契约
-tests/integration/   62 个：端到端流程、降级、trace 贯穿、会话恢复、并发幂等
-```
-
-重点用例：
-- `test_hints_do_not_change_outcome` — 关键词不参与决策
-- `test_every_request_retries_llm` — 上次失败不影响下次调用
-- `test_degraded_blocks_refund` — 降级期零写操作
-- `test_containing_confirmation_word_is_rejected` — "确认不了"不触发执行
-- `test_trace_propagates_to_mock` — trace 贯穿两个服务
-
----
-
-## 转人工接口（Feature 003）
-
-| 方法 | 路径 | 说明 |
-|---|---|---|
-| GET | `/handoff/queue` | 队列深度、优先���分布、上下文包列表 |
-| POST | `/handoff/accept` | 人工接入 `{session_id}` |
-| POST | `/handoff/decline` | 人工拒绝 `{session_id}` |
-| POST | `/handoff/resolve` | 结束会话 |
-
-### 四类触发源与判定顺序
-
-```
-1. 用户主动要求   ← 用户要真人，其他判断都是多余的
-2. 风险           ← 投诉/情绪激烈，不能让 AI 再多说一轮
-3. 系统异常       ← 工具连续失败，用户已经等很久
-4. 能力边界外     ← 可以先给自助建议，最不紧急
-```
-
-「我要投诉，转人工」同时命中 1 和 2，**按 1 处理**：用户要的是"人"，不是"AI 道歉"。
-
-### 情绪判定：纯规则，零 LLM
-
-判错后果只是优先级排序偏移，与意图识别的代价不同：
-
-| | 意图识别（002） | 情绪判定（003） |
-|---|---|---|
-| 判错后果 | 动错钱 | 优先级偏一点 |
-| 用 LLM | 必须 | 不需要 |
-| 一致性 | 可容忍随机 | 必须确定 |
-
-### 优先级
-
-```
-风险触发 > 情绪激烈 > 金额超阈值 > 用户主动要求 > 其他
-```
-
-返回 `(优先级, 依据)` 二元组，依据强制非空——优先级决定真人的工作分配，必须能向主管解释。
-
-### Context Pack
-
-摘要用纯字符串拼接，**没有网络、没有 IO、没有模型**。转人工是最不能挂的路径。
-
-风险触发时**不包含 AI 建议**——风险场景不该由 AI 出方案。
-
-### AI 静默
-
-`HUMAN_SERVING` 状态下 AI 输出会抛 `SilenceViolation`。抛异常而非返回 False，因为返回值容易被调用方忽略。
-
-状态机里 **`HUMAN_SERVING → NORMAL` 这条边不存在**，人工拒绝也无法回流给 AI。
-
-### 话术
-
-七条话术全部配置化。测试扫描全部话术，**出现时间数字即失败**（如"预计 30 秒"）。

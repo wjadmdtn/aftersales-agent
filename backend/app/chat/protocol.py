@@ -30,6 +30,10 @@ class MessageType(StrEnum):
     USER_HANDOFF = "user.handoff"
     # 地址表单提交：结构化地址由前端表单给出，不经自由文本解析
     USER_ADDRESS = "user.address"
+    # 确认卡按钮：用户点击确认/取消后发这个帧，替代自由文本"确认"
+    USER_CONFIRM = "user.confirm"
+    # 服务端下发确认卡（退款/改地址），前端据此渲染确认/取消按钮
+    CONFIRM_CARD = "confirm.card"
     ASSISTANT_DELTA = "assistant.delta"
     ASSISTANT_DONE = "assistant.done"
     # 人工端
@@ -45,6 +49,7 @@ CLIENT_TO_SERVER = frozenset(
         MessageType.PONG,
         MessageType.USER_MESSAGE,
         MessageType.USER_ADDRESS,
+        MessageType.USER_CONFIRM,
         MessageType.USER_HANDOFF,
         MessageType.AGENT_MESSAGE,
         # 人工消息理论上不经客户端发，但协议声明它双向以保持对称
@@ -53,6 +58,7 @@ CLIENT_TO_SERVER = frozenset(
 )
 
 SERVER_TO_CLIENT = frozenset(MessageType) - {MessageType.USER_MESSAGE, MessageType.USER_ADDRESS,
+                                             MessageType.USER_CONFIRM,
                                              MessageType.USER_HANDOFF,
                                              MessageType.AGENT_MESSAGE}
 

@@ -90,3 +90,13 @@ export interface PendingAssistant {
   text: string
   streaming: boolean
 }
+
+/** 服务端下发的确认卡（退款/改地址）：用户只能点按钮确认或取消 */
+export interface ConfirmCard {
+  card_id: string
+  action: 'refund' | 'change_address'
+  order_id: string
+  amount: string | null
+  summary: string
+  expires_at: string
+}

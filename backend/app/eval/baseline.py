@@ -13,7 +13,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from app.eval.schema import EvalReport, MetricLine
+from app.eval.schema import EvalReport
 
 
 @dataclass(frozen=True)

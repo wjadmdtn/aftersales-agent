@@ -3,8 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from decimal import Decimal
-from enum import StrEnum, IntEnum
-from typing import Any, Literal
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
@@ -102,21 +101,3 @@ class HandoffContext(BaseModel):
     suggested_next_step: str | None = None
 
     queued_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-class QueueItem(BaseModel):
-    session_id: str
-    priority: Priority
-    queued_at: datetime
-
-
-ScriptKey = Literal[
-    "user_request", "risk", "system_error", "boundary", "queued_followup", "queued_ask_time", "declined"
-]
-
-
-class HandoffEvent(BaseModel):
-    session_id: str
-    event: Literal["triggered", "queued", "accepted", "declined", "resolved"]
-    detail: dict[str, Any] = Field(default_factory=dict)
-    at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

@@ -4,7 +4,6 @@ from __future__ import annotations
 from contextlib import contextmanager
 from contextvars import ContextVar
 from decimal import Decimal
-from typing import Any
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field, field_validator

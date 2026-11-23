@@ -89,6 +89,8 @@ async def _serve(conn: Connection, hub: Hub) -> None:
             await streamer.handle_user_message(conn, frame)
         elif frame.type is MessageType.USER_ADDRESS:
             await streamer.handle_user_address(conn, frame)
+        elif frame.type is MessageType.USER_CONFIRM:
+            await streamer.handle_user_confirm(conn, frame)
         elif frame.type is MessageType.USER_HANDOFF:
             await streamer.handle_user_handoff(conn, frame)
         elif frame.type is MessageType.AGENT_MESSAGE:

@@ -42,11 +42,21 @@ async def test_get_returns_none_for_unknown(reg):
 
 async def test_set_state_writes_agent_fields(reg):
     await reg.ensure("s1", user_id="u1")
+    await reg.set_state("s1", HandoffState.QUEUED)
     st = await reg.set_state("s1", HandoffState.HUMAN_SERVING,
                              agent_id="demo-agent", agent_name="小王")
     assert st.state is HandoffState.HUMAN_SERVING
     assert st.agent_id == "demo-agent"
     assert st.agent_name == "小王"
+
+
+async def test_set_state_rejects_illegal_transition(reg):
+    """状态机守卫已接线：不能跳过排队直接进人工。"""
+    from app.handoff.state import IllegalTransition
+
+    await reg.ensure("s1", user_id="u1")
+    with pytest.raises(IllegalTransition):
+        await reg.set_state("s1", HandoffState.HUMAN_SERVING)
 
 
 async def test_resolved_is_terminal(reg):

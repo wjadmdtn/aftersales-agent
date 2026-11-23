@@ -106,3 +106,26 @@ async def test_stats_track_replays_and_failures():
     with pytest.raises(LLMError):
         await c2.classify(user_input="我要退款", hint_keywords=[], context={})
     assert stats.schema_failures == fail_before + 1
+
+
+async def test_non_json_body_becomes_llm_error():
+    """200 但 body 非 JSON（网关错误页/截断）→ LLMError，走降级而不是冒泡成 500。"""
+    import json as jsonlib
+
+    c = OpenAICompatLLMClient(base_url="http://x", api_key="k", model="m")
+
+    class _Resp:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self):
+            raise jsonlib.JSONDecodeError("bad", "<html>not json</html>", 0)
+
+    class _Http:
+        async def post(self, *a, **kw):
+            return _Resp()
+
+    c._http = lambda: _Http()  # type: ignore[assignment]
+
+    with pytest.raises(LLMError):
+        await c._complete([{"role": "user", "content": "x"}])

@@ -66,10 +66,6 @@ class RetrievalResult(BaseModel):
     rerank_rejected: bool = False
 
     @property
-    def top_similarity(self) -> float | None:
-        return self.candidates[0].similarity if self.candidates else None
-
-    @property
     def clause_ids(self) -> set[str]:
         return {c.clause.clause_id for c in self.candidates}
 

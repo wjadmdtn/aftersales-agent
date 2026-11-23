@@ -19,21 +19,30 @@ AI_SPEAKABLE = frozenset(
 )
 
 _ALLOWED: dict[HandoffState, frozenset[HandoffState]] = {
+    # NORMAL → QUEUED 是真实链路：转人工/快捷转人工直接入队，不经过 HANDOFF_REQUESTED
+    # NORMAL/HANDOFF_REQUESTED → RESOLVED：允许直接结束会话（终态，不涉及 AI/人工归属）
     HandoffState.NORMAL: frozenset(
-        {HandoffState.NORMAL, HandoffState.HANDOFF_REQUESTED}
+        {HandoffState.NORMAL, HandoffState.HANDOFF_REQUESTED, HandoffState.QUEUED, HandoffState.RESOLVED}
     ),
     HandoffState.HANDOFF_REQUESTED: frozenset(
-        {HandoffState.HANDOFF_REQUESTED, HandoffState.QUEUED, HandoffState.NORMAL}
+        {HandoffState.HANDOFF_REQUESTED, HandoffState.QUEUED, HandoffState.NORMAL, HandoffState.RESOLVED}
     ),
-    HandoffState.QUEUED: frozenset({HandoffState.QUEUED, HandoffState.HUMAN_SERVING}),
-    # 刻意没有 NORMAL：人工服务中不能回流给 AI
-    HandoffState.HUMAN_SERVING: frozenset({HandoffState.RESOLVED}),
+    HandoffState.QUEUED: frozenset(
+        {HandoffState.QUEUED, HandoffState.HUMAN_SERVING, HandoffState.RESOLVED}
+    ),
+    # 刻意没有 NORMAL：人工服务中不能回流给 AI。
+    # 允许回到 QUEUED：人工之间转接（拒绝=转给其他在线客服），仍由人而非 AI 接手。
+    HandoffState.HUMAN_SERVING: frozenset(
+        {HandoffState.HUMAN_SERVING, HandoffState.QUEUED, HandoffState.RESOLVED}
+    ),
     HandoffState.RESOLVED: frozenset(),
 }
 
 HUMAN_ONLY = frozenset(
     {
         (HandoffState.QUEUED, HandoffState.HUMAN_SERVING),
+        (HandoffState.QUEUED, HandoffState.RESOLVED),
+        (HandoffState.HUMAN_SERVING, HandoffState.QUEUED),
         (HandoffState.HUMAN_SERVING, HandoffState.RESOLVED),
     }
 )

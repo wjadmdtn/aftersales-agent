@@ -13,9 +13,9 @@
 | [003 转人工链路](specs/003-handoff/) | ✅ 完成 |
 | [004 评测集与回归](specs/004-evaluation/) | ✅ 完成 |
 | [005 政策 RAG](specs/005-policy-rag/) | ✅ 完成 |
-| [006 客服前端（订单页 + 对话页 + 人工工作台）](specs/006-web-ui/) | ✅ 完成，547 后端测试 + 37 前端测试 + 7 E2E 通过 |
-| [007 LLM 输出校验重放](specs/007-llm-schema-replay/) | ✅ 完成，621 后端测试通过 |
-| 008 催发货（业务动作） | ✅ 完成，648 后端测试通过 |
+| [006 客服前端（订单页 + 对话页 + 人工工作台）](specs/006-web-ui/) | ✅ 完成 |
+| [007 LLM 输出校验重放](specs/007-llm-schema-replay/) | ✅ 完成 |
+| 008 催发货（业务动作） | ✅ 完成 |
 
 ## 催发货：唯一的低风险写操作
 
@@ -89,7 +89,7 @@ Agent 能真的去催单，不只是解释规则。
 
 ## 评测结果
 
-292 条用例，按**处理路径**判分。以下为 `--llm=real`（deepseek-v4-flash）+ bge 的实测数字，
+299 条用例，按**处理路径**判分。以下为 `--llm=real`（deepseek-v4-flash）+ bge 的实测数字，
 可直接引用；桩（`--llm=stub`）的报告准确率虚高，**不可对外引用**。
 
 跑完自动生成 HTML 报告并打开（`eval/report/latest.html`，支持按路径筛选、搜 ID、只看失败）：
@@ -114,7 +114,7 @@ Agent 能真的去催单，不只是解释规则。
 | ├ adversarial | 84.4% (27/32) | 对抗表述（威胁、否定、转述） |
 | └ no_keyword | 75.0% (15/20) | 不含意图关键词的诉求 |
 
-292 条里 14 条失败，报告页可直接筛出这 14 条看输入、期望、实际三列对照。
+失败用例可在报告页直接筛出，查看输入、期望、实际三列对照。
 
 > **数字口径**：`temperature=0` 只降低随机性，不消除随机性。同一条输入多次调用
 > 仍可能判定不同（实测「再不处理我就投诉你们不肯退款」5 次中 4 次判 refund、
@@ -129,7 +129,7 @@ Agent 能真的去催单，不只是解释规则。
 **重跑方式**：
 
 ```bash
-python eval/runner.py --llm=real --embedder=bge   # 约 11 分钟（292 条，内网模型）
+python eval/runner.py --llm=real --embedder=bge   # 约 11 分钟（299 条，内网模型）
 python eval/runner.py --llm=stub                  # 秒级，仅验链路
 ```
 
@@ -193,8 +193,6 @@ mkdir -p ../backend/app/static && cp -r dist/* ../backend/app/static/
 docker compose up --build
 # 打开 http://localhost:8000
 ```
-
-> 镜像内**不跑 Redis**，入口用 `dev_server`（fakeredis 顶替），因此重启后队列与会话清空。
 
 ## 演示级限制（务必知悉）
 

@@ -105,10 +105,11 @@ async function accept() {
   await loadQueue()
 }
 
-async function decline() {
+async function transfer() {
   if (!activeId.value) return
-  await api.decline(activeId.value, agentId.value)
+  await api.transfer(activeId.value, agentId.value)
   await loadQueue()
+  await loadMine()
 }
 
 async function resolve() {
@@ -166,7 +167,7 @@ onBeforeUnmount(() => socket?.close())
             >
               接入
             </el-button>
-            <el-button size="small" data-test="decline" @click="decline">拒绝</el-button>
+            <el-button v-if="activeIsMine" size="small" data-test="transfer" @click="transfer">转接</el-button>
             <el-button v-if="activeIsMine" size="small" type="danger" data-test="resolve" @click="resolve">
               结束会话
             </el-button>

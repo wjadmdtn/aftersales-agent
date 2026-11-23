@@ -38,8 +38,8 @@ export const api = {
   getQueue: () => getJson<{ items: QueueItem[]; depth: number }>('/handoff/queue'),
   accept: (sessionId: string, agentId: string) =>
     postJson<{ state: string }>('/handoff/accept', { session_id: sessionId, agent_id: agentId }),
-  decline: (sessionId: string, agentId: string) =>
-    postJson<{ state: string }>('/handoff/decline', { session_id: sessionId, agent_id: agentId }),
+  transfer: (sessionId: string, agentId: string) =>
+    postJson<{ state: string }>('/handoff/transfer', { session_id: sessionId, agent_id: agentId }),
   resolve: (sessionId: string, agentId: string) =>
     postJson<{ state: string }>('/handoff/resolve', { session_id: sessionId, agent_id: agentId }),
 }

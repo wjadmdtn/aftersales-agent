@@ -128,7 +128,17 @@ class Retriever:
             candidates = [best_vec_item] + rest
 
         if len(candidates) >= 2:
-            second = self._vector_score(candidates[1])
+            # 第二候选必须是"向量分第二高"，不能取融合排序的第二位：
+            # 关键词融合会把低向量分条款顶到前面，拿它的分算 gap 会把
+            # 本该歧义的情况判成不歧义（gap 被算大）。
+            second = max(
+                (
+                    s
+                    for s in (self._vector_score(c) for c in candidates[1:])
+                    if s is not None
+                ),
+                default=None,
+            )
             if second is not None:
                 gap = top1_vec - second
                 if gap < self.margin:

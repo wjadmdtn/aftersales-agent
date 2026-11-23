@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 from typing import Protocol, runtime_checkable
 
-from app.policy.models import PolicyClause, RetrievalDecision, RetrievalResult, RetrievedClause
+from app.policy.models import PolicyClause, RetrievalDecision, RetrievalResult
 
 logger = logging.getLogger(__name__)
 
@@ -29,10 +29,6 @@ class RerankLLM(Protocol):
     ) -> dict[str, float]:
         """返回 clause_id → 相关性分（0~1）。实现方不得自行剔除条款。"""
         ...
-
-
-class Reranker(Protocol):
-    async def apply(self, *, query: str, retrieval: RetrievalResult) -> RetrievalResult: ...
 
 
 class NoopReranker:

@@ -87,18 +87,26 @@ async def accept(body: SessionIn) -> dict:
     }
 
 
-@router.post("/decline")
-async def decline(body: SessionIn) -> dict:
-    from app.chat.broadcast import on_queue_declined
+@router.post("/transfer")
+async def transfer(body: SessionIn) -> dict:
+    """人工不允许拒绝，只能转接给其他在线客服（mock：放回队列）。"""
+    from app.chat.broadcast import on_queue_transferred
+    from app.chat.runtime import get_chat
 
-    outcome = await get_coordinator().human_decline(body.session_id)
+    agent_id, _ = _agent(body)
+    state = await get_chat().registry.get(body.session_id)
+    if state is not None and state.agent_id and state.agent_id != agent_id:
+        raise HTTPException(
+            status_code=403, detail={"code": "not_owner", "owner_agent_id": state.agent_id}
+        )
+
+    outcome = await get_coordinator().human_transfer(body.session_id)
     if outcome is None:
         raise HTTPException(status_code=404, detail="没有该会话的排队记录")
-    await on_queue_declined(body.session_id)
+    await on_queue_transferred(body.session_id)
     return {
         "state": outcome.state.value,
         "events": outcome.events,
-        "reply": outcome.reply,
     }
 
 
@@ -119,8 +127,10 @@ async def resolve(body: SessionIn) -> dict:
     await get_coordinator().resolve(body.session_id)
 
     if state is not None:
+        from app.handoff.state import IllegalTransition
+
         try:
             await on_resolved(body.session_id)
-        except ValueError:
-            pass  # 已经是终态
+        except (ValueError, IllegalTransition):
+            pass  # 已经是终态，或当前状态不允许直接 resolved
     return {"state": "resolved"}

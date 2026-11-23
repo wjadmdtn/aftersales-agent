@@ -37,6 +37,9 @@ def test_all_message_types_declared():
         "user.message.ack",
         # 地址表单提交
         "user.address",
+        # 确认卡：按钮确认
+        "user.confirm",
+        "confirm.card",
     }
     assert {t.value for t in MessageType} == expected
 

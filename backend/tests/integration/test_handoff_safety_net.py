@@ -186,6 +186,26 @@ async def test_manual_request_during_pending_card_still_hands_off(make_env):
     assert await loop.sessions.get_pending("s-bypass") is None
 
 
+async def test_risk_keyword_does_not_mask_system_error_handoff(make_env):
+    """系统已连续失败时，带"投诉"等风险词的同一句仍要触发转人工（回归）。
+
+    完整 evaluate 里 RISK 排在 SYSTEM_ERROR 前面，若用 detect() 判"是否因
+    系统异常转人工"，一句"我要投诉"会把 SYSTEM_ERROR 挡住，用户永远等不到接人。
+    """
+    loop, _ = make_env(
+        fail_actions={"order.get"},
+        responses={"订单状态": IntentResult(intent=Intent.QUERY_ORDER, confidence=0.9)},
+    )
+    for _ in range(3):
+        await _say(loop, "s-risk-sys", "订单状态")
+    state = await loop.sessions.get("s-risk-sys")
+    assert state is not None and state.tool_failure_streak == 3
+
+    # 这句既是风险词（投诉），又处于系统持续异常：必须转人工，不能被 RISK 挡掉
+    r = await _say(loop, "s-risk-sys", "我要投诉")
+    assert r.state == "handoff_queued"
+
+
 async def test_policy_gap_handoff_carries_boundary_trigger(make_env):
     """知识库答不了 → BOUNDARY 触发（这条原本就通，防回归）。"""
     from datetime import date
