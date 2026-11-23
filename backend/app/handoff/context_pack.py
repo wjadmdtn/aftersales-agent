@@ -58,15 +58,12 @@ def rule_based_summary(
     primary_intent: str,
     last_user_message: str,
     trigger: TriggerResult,
-    attempted: list[AttemptedAction],
 ) -> str:
     parts = [
         f"用户诉求：{_INTENT_LABEL.get(primary_intent, primary_intent)}",
         f"用户表述：{last_user_message}",
         f"转人工原因：{_TRIGGER_LABEL[trigger.trigger_type]}",
     ]
-    if attempted:
-        parts.append("已尝试：" + "、".join(a.tool for a in attempted))
     return truncate("；".join(parts))
 
 
@@ -92,7 +89,6 @@ def build_context(
         primary_intent=primary_intent,
         last_user_message=last_user_message,
         trigger=trigger,
-        attempted=actions,
     )
     priority, reason = calc_priority(
         trigger_type=trigger.trigger_type,

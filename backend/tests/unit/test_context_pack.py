@@ -69,7 +69,8 @@ def test_actions_recorded():
         attempted=[AttemptedAction(tool="order.get", result_status=ToolStatus.OK)],
     )
     assert len(ctx.attempted_actions) == 1
-    assert "order.get" in ctx.summary
+    # 工具调用通过结构化字段交给前端展示，摘要只保留诉求、原话与触发原因
+    assert "order.get" not in ctx.summary
 
 
 def test_requires_trigger():
@@ -80,10 +81,6 @@ def test_requires_trigger():
 def test_summary_makes_no_io():
     """摘要必须是纯函数：同样的输入永远同样的输出。"""
     t = _trigger(TriggerType.RISK)
-    a = rule_based_summary(
-        primary_intent="refund", last_user_message="我要退款", trigger=t, attempted=[]
-    )
-    b = rule_based_summary(
-        primary_intent="refund", last_user_message="我要退款", trigger=t, attempted=[]
-    )
+    a = rule_based_summary(primary_intent="refund", last_user_message="我要退款", trigger=t)
+    b = rule_based_summary(primary_intent="refund", last_user_message="我要退款", trigger=t)
     assert a == b
