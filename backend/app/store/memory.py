@@ -7,9 +7,10 @@ from __future__ import annotations
 
 import asyncio
 import copy
+from datetime import datetime, timezone
 from pathlib import Path
 
-from app.models.domain import Address, Logistics, Order, Refund
+from app.models.domain import Address, Logistics, Order, Refund, ShipmentUrge
 from app.models.enums import OrderStatus
 from app.store.seed import SeedData, load_seed
 
@@ -25,6 +26,9 @@ class MemoryStore:
         self._refunds: dict[str, Refund] = {}
         # (action, request_id) -> refund_id
         self._refund_by_request: dict[tuple[str, str], str] = {}
+        self._urges: dict[str, ShipmentUrge] = {}
+        # (action, request_id) -> urge_id
+        self._urge_by_request: dict[tuple[str, str], str] = {}
         self._locks = [asyncio.Lock() for _ in range(lock_shards)]
 
     def reset(self) -> None:
@@ -32,6 +36,8 @@ class MemoryStore:
         self._data = load_seed(self._seed_path)
         self._refunds.clear()
         self._refund_by_request.clear()
+        self._urges.clear()
+        self._urge_by_request.clear()
         self._locks = [asyncio.Lock() for _ in self._locks]
 
     # ---------- 读 ----------
@@ -73,3 +79,34 @@ class MemoryStore:
         order = self._data.orders.get(refund.order_id)
         if order is not None:
             order.status = OrderStatus.REFUNDED
+
+    # ---------- 催发货 ----------
+
+    def find_urge_by_request(self, action: str, request_id: str) -> ShipmentUrge | None:
+        urge_id = self._urge_by_request.get((action, request_id))
+        if urge_id is None:
+            return None
+        return copy.deepcopy(self._urges[urge_id])
+
+    def find_recent_urge(
+        self, order_id: str, *, within_s: int, now: datetime | None = None
+    ) -> ShipmentUrge | None:
+        """该订单在 within_s 秒内是否已经催过。
+
+        用户连点、网络重试都会产生新的 request_id，光靠幂等键挡不住刷屏，
+        所以再加一道按订单的时间窗去重。
+        """
+        current = now or datetime.now(timezone.utc)
+        recent = [
+            u for u in self._urges.values()
+            if u.order_id == order_id
+            and (current - u.created_at).total_seconds() < within_s
+        ]
+        if not recent:
+            return None
+        return copy.deepcopy(max(recent, key=lambda u: u.created_at))
+
+    def save_urge(self, urge: ShipmentUrge, action: str) -> None:
+        """催单不改变订单状态——它只是通知商家，不是订单流转。"""
+        self._urges[urge.urge_id] = urge
+        self._urge_by_request[(action, urge.request_id)] = urge.urge_id

@@ -57,3 +57,18 @@ class Refund(BaseModel):
     status: RefundStatus = RefundStatus.SUCCESS
     request_id: str
     created_at: datetime = Field(default_factory=_now)
+
+
+class ShipmentUrge(BaseModel):
+    """催发货记录。
+
+    与退款不同：催单可重复、不涉及资金，重复提交对用户没有损失，
+    所以没有金额/状态机字段，只有"什么时候催的"和"商家该在什么时候回应"。
+    """
+
+    urge_id: str
+    order_id: str
+    request_id: str
+    created_at: datetime = Field(default_factory=_now)
+    # 商家必须回应的截止时间，由服务端按承诺时效算出，不交给调用方
+    merchant_deadline_at: datetime

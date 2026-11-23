@@ -52,6 +52,21 @@ class MockServiceClient:
             r.raise_for_status()
             return r.json()
 
+    async def create_urge(
+        self,
+        order_id: str,
+        *,
+        request_id: str,
+        trace_id: str,
+    ) -> dict[str, Any]:
+        async with httpx.AsyncClient(timeout=self.timeout_ms / 1000) as c:
+            r = await c.post(
+                f"{self.base_url}/orders/{order_id}/urge",
+                headers=self._headers(trace_id=trace_id, request_id=request_id),
+            )
+            r.raise_for_status()
+            return r.json()
+
     async def update_address(
         self, order_id: str, address: dict[str, Any], *, trace_id: str, request_id: str | None = None
     ) -> dict[str, Any]:

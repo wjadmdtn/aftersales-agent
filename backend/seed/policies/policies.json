@@ -187,21 +187,19 @@
     "title": "未按时发货的赔付",
     "body": "商家须在承诺时间内发货（默认付款后48小时内，预售商品按页面约定）。超时未发货，消费者可申请催发货，商家须24小时内回应。超72小时仍未发货，消费者可申请仅退款（无需退货）。部分类目逾期未发货，平台按订单金额一定比例（通常5%，单笔上限500元）赔付。",
     "exceptions": ["预售商品、定制商品、不可抗力（疫情管控、极端天气）按页面约定，不适用逾期赔付"],
+    "params": {"sla_hours": 48, "urge_response_hours": 24, "refund_threshold_hours": 72},
     "applies_to": {"product_types": ["*"], "scenes": ["unshipped"]}
   },
   {
     "clause_id": "LOGISTICS-02",
     "policy_id": "LOGISTICS",
-    "version": 3,
+    "version": 4,
     "effective_from": "2026-01-01",
     "effective_to": null,
     "category": "logistics",
     "title": "物流显示签收但未收到货",
-    "body": "物流显示签收但消费者未收到，应先向快递公司发起未收到货核查，商家须配合提供签收凭证。待核查期间，订单售后时效暂停计算。核查确认丢失的，按订单实付金额全额退款或补发。",
-    "exceptions": [
-      "签收凭证（本人签收、门卫代收、快递柜取件码使用记录）显示已妥投的，需用户先行确认是否由他人代收",
-      "生鲜类超过签收时间后才反馈的，需结合冷链时效判断"
-    ],
+    "body": "物流显示签收但未收到货的，请联系快递公司核实签收情况，由快递公司发起未收到货核查。",
+    "exceptions": [],
     "applies_to": {"product_types": ["*"], "scenes": ["shipped"]}
   },
   {

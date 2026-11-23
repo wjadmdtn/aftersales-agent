@@ -18,6 +18,7 @@ from app.observability.trace import current_trace_id, elapsed_ms
 from app.services import address as address_service
 from app.services import logistics as logistics_service
 from app.services import order as order_service
+from app.services import urge as urge_service
 from app.services import refund as refund_service
 from app.store.memory import MemoryStore
 
@@ -142,6 +143,23 @@ async def create_refund(
         request_id=request_id or None,
     )
     logger.info("refund.create order_id=%s code=%s", order_id, result.code.name)
+    return result
+
+
+@router.post("/orders/{order_id}/urge", response_model=BizResult)
+async def create_urge(order_id: str, request: Request) -> BizResult:
+    """催发货。写操作，但不改变订单状态，只是通知商家。"""
+    meta = meta_of(request)
+    request_id = request.headers.get("X-Request-Id", "")
+    result = await urge_service.create_urge(get_store(), order_id, request_id, meta)
+    _record(
+        result,
+        action=urge_service.ACTION,
+        request=request,
+        payload={"order_id": order_id},
+        request_id=request_id or None,
+    )
+    logger.info("urge.create order_id=%s code=%s", order_id, result.code.name)
     return result
 
 

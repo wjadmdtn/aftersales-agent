@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.config import settings
 from app.models.enums import ResultCode
 
 
@@ -37,6 +38,10 @@ def render(body: dict[str, Any]) -> str:
         reason = body.get("reason") or ""
         if "REFUND" in reason and ("REFUNDED" in reason or "退款" in reason):
             return "这笔订单已经退款完成了，不需要重复申请哦。"
+        # 催单的状态拒绝话术由业务层按订单状态给出（已发货/未支付/已退款各不相同），
+        # 这里直接透传，避免在展示层再维护一份状态表
+        if "催" in reason:
+            return reason
         return "这笔订单当前的状态不支持该操作。"
 
     if code is ResultCode.AMOUNT_EXCEEDS_ORDER:
@@ -58,6 +63,12 @@ def render(body: dict[str, Any]) -> str:
 def _render_ok(body: dict[str, Any], data: dict[str, Any]) -> str:
     # 按唯一字段判别响应类型，不能用字段存在性猜：
     # 订单本身也有 address 字段，用 "address" in data 会把订单误判成改地址成功
+    if "urge_id" in data:
+        # 重复催单也返回这句：用户不需要知道"这是第几次"，只需要知道受理了
+        return (
+            f"已为您提交催单，商家会在 {settings.urge_response_hours} 小时内回应。"
+            f"有进展我会及时同步您。"
+        )
     if "refund_id" in data:
         amount = data.get("amount", "")
         return (

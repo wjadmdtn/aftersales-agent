@@ -44,10 +44,6 @@ logger = logging.getLogger(__name__)
 # 与种子数据一致：ORD + 至少 4 位数字
 ORDER_ID_PATTERN = re.compile(r"ORD\d{4,}")
 AMOUNT_PATTERN = re.compile(r"(\d+(?:\.\d{1,2})?)\s*(?:元|块|块钱)?")
-# 手机号：改地址必须带收件人联系方式，用它作为"用户确实给了新地址"的判据
-PHONE_PATTERN = re.compile(r"1\d{10}")
-# 行政区划关键词：出现即认为消息里有地址内容
-ADDRESS_HINTS = ("省", "市", "区", "县", "路", "街", "号", "栋", "室", "小区", "镇", "村")
 
 # 业务码 → 工具状态。2xxx（没这个对象）是"查不到"，不是"失败了"：
 # 前者该转人工说明情况，后者要累计失败次数，两者处理完全不同。
@@ -353,6 +349,11 @@ class AgentLoop:
             # 不弹确认、不调工具、不改订单——换货申请由用户在订单页自己提交。
             return await self._handle_exchange(state, trace_id=trace_id)
 
+        if intent is Intent.URGE_SHIPMENT:
+            return await self._handle_urge(
+                state, mode, message, trace_id=trace_id
+            )
+
         if intent is Intent.MANUAL:
             return await self._handoff(
                 state, message, primary_intent="manual", trace_id=trace_id
@@ -654,6 +655,76 @@ class AgentLoop:
             state="exchange_available",
         )
 
+    async def _handle_urge(
+        self, state: SessionState, mode: IntentMode, message: str, *, trace_id: str
+    ) -> AgentReply:
+        """催发货。
+
+        唯一的低风险写操作：可重复、不涉钱、不改变订单状态，所以不弹确认卡——
+        用户说"帮我催一下"本身就是要执行这个动作。
+        但执行前仍要重新查一次订单：说完到真正执行之间它可能刚好发货了，
+        催一个已发货的单既无意义也会让用户觉得系统在敷衍。
+        """
+        if not state.order_id:
+            return AgentReply(
+                reply="请问是哪一笔订单呢？我帮您催一下。",
+                intent=Intent.URGE_SHIPMENT,
+                state="need_order",
+            )
+
+        body = await self._call(
+            lambda: self.tools.get_order(state.order_id, trace_id=trace_id), state
+        )
+        if body.get("code") != ResultCode.OK:
+            return AgentReply(
+                reply=present.render(body),
+                intent=Intent.URGE_SHIPMENT,
+                state="urge_failed",
+            )
+        status = (body.get("data") or {}).get("status")
+
+        if mode is not IntentMode.EXECUTE:
+            # 只在陈述"一直没发货"或问能不能催：解释并征询，不替用户做写操作。
+            # 抱怨自动催单是越权——他没说要催。
+            return AgentReply(
+                reply=_urge_hint(status),
+                intent=Intent.URGE_SHIPMENT,
+                tool_calls=["order.get"],
+                state="urge_advice",
+            )
+
+        if status != "PAID":
+            return AgentReply(
+                reply=_urge_hint(status),
+                intent=Intent.URGE_SHIPMENT,
+                tool_calls=["order.get"],
+                state="urge_rejected",
+            )
+
+        # 幂等键取自会话轮次：同一轮重试复用同一把钥匙，跨轮才会生成新催单
+        request_id = f"urge:{state.order_id}:{state.session_id}:{state.turn_count}"
+        urged = await self._call(
+            lambda: self.tools.create_urge(
+                state.order_id, request_id=request_id, trace_id=trace_id
+            ),
+            state,
+        )
+        if urged.get("_transport_error"):
+            # 系统失败如实告知，不伪装成功：用户有权知道催单没提交上去，
+            # 否则他会以为商家已收到，一直等下去。
+            return AgentReply(
+                reply="催单暂时没提交成功，您可以稍后再试，或者我帮您转人工跟进。",
+                intent=Intent.URGE_SHIPMENT,
+                tool_calls=["order.get", "urge.create"],
+                state="urge_failed",
+            )
+        return AgentReply(
+            reply=present.render(urged),
+            intent=Intent.URGE_SHIPMENT,
+            tool_calls=["order.get", "urge.create"],
+            state="urge_submitted",
+        )
+
     async def _handle_inquiry(
         self, state: SessionState, intent: Intent, *, trace_id: str
     ) -> AgentReply:
@@ -778,15 +849,14 @@ class AgentLoop:
                     intent=intent,
                     state="write_rejected",
                 )
-            # 没说新地址就弹确认，等于让用户确认一个空地址——
-            # 服务端会拒，用户白点一次。先问清楚要改成哪里。
-            if not _extract_address(message):
-                return AgentReply(
-                    reply="好的，请把新的收货人、手机号、地址发给我，我帮您修改。",
-                    intent=intent,
-                    state="need_address",
-                )
-            amount = None
+            # 地址一律由前端表单结构化提交，不从自由文本里抽。
+            # 文本抽取拿不到可靠的省市区，抽错了就是把用户的东西寄到错误的地址；
+            # 拼不出摘要时确认卡还会是空的。这里只负责把用户引到表单。
+            return AgentReply(
+                reply="好的，请填写新的收货信息（收件人、手机号、省市区和详细地址）。",
+                intent=intent,
+                state="need_address",
+            )
         else:
             # 用户未说金额时按订单全额退款。金额取自库，不用前端快照。
             if status == "REFUNDED":
@@ -808,14 +878,64 @@ class AgentLoop:
             intent=intent,
             order_id=state.order_id,
             amount=amount,
-            payload={"address": _extract_address(message) or {}} if intent is Intent.CHANGE_ADDRESS else {},
+            payload={},
         )
         await self.sessions.set_pending(state.session_id, pending)
         state.pending_refund_amount = pending.amount
         return AgentReply(reply=pending.summary, intent=intent, state="awaiting_confirmation")
 
-    # ---------- 确认处理 ----------
+    async def submit_address(
+        self,
+        *,
+        session_id: str,
+        user_id: str,
+        address: dict,
+        trace_id: str,
+    ) -> AgentReply:
+        """前端地址表单提交的结构化地址，校验后生成确认卡。
 
+        地址必须来自表单：自由文本里抽不出可靠的省市区，猜错就是把货寄到错误的地方。
+        这里不落库，只生成待确认，用户回「确认」后才真正写入。
+        """
+        state = await self.sessions.get_or_create(session_id, user_id=user_id)
+        if not state.order_id:
+            return AgentReply(
+                reply="请问是哪一笔订单呢？麻烦提供一下订单号。",
+                intent=Intent.CHANGE_ADDRESS,
+                state="need_order",
+            )
+
+        body = await self.tools.get_order(state.order_id, trace_id=trace_id)
+        if body.get("code") != ResultCode.OK:
+            return AgentReply(
+                reply=present.render(body),
+                intent=Intent.CHANGE_ADDRESS,
+                tool_calls=["order.get"],
+                state="inquiry_failed",
+            )
+        order = body.get("data") or {}
+        if order.get("status") not in ("PENDING_PAYMENT", "PAID"):
+            return AgentReply(
+                reply="订单已经发货了，收货地址无法修改。",
+                intent=Intent.CHANGE_ADDRESS,
+                tool_calls=["order.get"],
+                state="write_rejected",
+            )
+
+        pending = build_confirmation(
+            intent=Intent.CHANGE_ADDRESS,
+            order_id=state.order_id,
+            amount=None,
+            payload={"address": address},
+        )
+        await self.sessions.set_pending(session_id, pending)
+        return AgentReply(
+            reply=pending.summary,
+            intent=Intent.CHANGE_ADDRESS,
+            state="awaiting_confirmation",
+        )
+
+    # ---------- 确认处理 ----------
     async def _handle_confirmation(
         self, state: SessionState, pending: PendingConfirmation, message: str, *, trace_id: str
     ) -> AgentReply:
@@ -916,6 +1036,35 @@ class AgentLoop:
 EXCHANGE_WINDOW_DAYS = 7
 
 
+def _urge_hint(status: str | None) -> str:
+    """按订单状态给催发货的说明。
+
+    与 present.render 里的状态拒绝话术分开：这里面向"用户还没说要催"的场景，
+    要点是解释现状并征询，而不是直接回一句"不支持"。
+    """
+    from app.config import settings
+
+    sla = settings.shipping_sla_hours
+    if status == "PENDING_PAYMENT":
+        return "这笔订单还没付款，付款后商家才会安排发货。"
+    if status == "PAID":
+        return (
+            f"您的订单目前是待发货状态，商家应在付款后 {sla} 小时内发货。"
+            f"需要我帮您催一下吗？"
+        )
+    if status == "SHIPPED":
+        return "这笔订单已经发货了，不需要催单哦，物流信息可以在订单里查看。"
+    if status == "DELIVERED":
+        return "这笔订单已经签收了，不需要催单哦。"
+    if status == "REFUNDING":
+        return "这笔订单正在退款处理中，不需要催发货。"
+    if status == "REFUNDED":
+        return "这笔订单已经退款完成了，不需要催发货。"
+    if status == "CLOSED":
+        return "这笔订单已经关闭了。"
+    return "这笔订单当前的状态不支持催发货。"
+
+
 def _extract_amount(message: str) -> Decimal | None:
     """从消息里抽出用户指定的退款金额。
 
@@ -925,21 +1074,6 @@ def _extract_amount(message: str) -> Decimal | None:
     text = ORDER_ID_PATTERN.sub(" ", message)
     matched = AMOUNT_PATTERN.search(text)
     return Decimal(matched.group(1)) if matched else None
-
-
-def _extract_address(message: str) -> dict | None:
-    """判断消息里是否包含可用的新地址信息。
-
-    只做"够不够"的粗判，不做精细解析——完整地址结构由前端表单提供。
-    判据：出现手机号，或出现两个以上行政区划关键词。
-    宁严勿松：判宽了会弹一个内容残缺的确认框，用户点了照样失败。
-    """
-    if PHONE_PATTERN.search(message):
-        return {"raw": message}
-    hits = sum(1 for h in ADDRESS_HINTS if h in message)
-    if hits >= 2:
-        return {"raw": message}
-    return None
 
 
 def _exchange_days_left(order: dict) -> int | None:

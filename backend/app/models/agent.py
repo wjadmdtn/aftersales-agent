@@ -29,6 +29,9 @@ class Intent(StrEnum):
     QUERY_ORDER = "query_order"
     # 换货：不直接办理，按订单状态给条件说明与自助入口。
     EXCHANGE = "exchange"
+    # 催发货：唯一的"低风险写操作"——可重复、不涉钱、不改变订单状态。
+    # 用 mode 区分问与办：execute 真催单，query/inquiry 只解释。
+    URGE_SHIPMENT = "urge_shipment"
     MANUAL = "manual"
     POLICY = "policy"      # 政策咨询：规则是什么，不是"我这一单怎样"
     # 诉求不明（含抱怨、闲聊、无法归类）。行为 == 安抚/澄清，绝不调工具、绝不转人工。
@@ -41,6 +44,7 @@ ACTIONABLE_INTENTS = {
     Intent.LOGISTICS,
     Intent.CHANGE_ADDRESS,
     Intent.QUERY_ORDER,
+    Intent.URGE_SHIPMENT,
 }
 
 # 会改变状态、必须确认的意图

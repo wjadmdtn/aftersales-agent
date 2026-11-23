@@ -21,6 +21,14 @@ class Settings(BaseSettings):
     debug_endpoints_enabled: bool = True
     log_level: str = "INFO"
 
+    # --- 催发货 ---
+    # 承诺发货时效与商家回应时效。政策条款 LOGISTICS-01 的 params 必须与此一致，
+    # 有单测锁死（改一处漏另一处会让话术和条款互相矛盾）。
+    shipping_sla_hours: int = Field(default=48, gt=0)
+    urge_response_hours: int = Field(default=24, gt=0)
+    # 同一订单在此窗口内重复催单直接返回首次结果，挡住连点与重试刷屏
+    urge_dedupe_window_s: int = Field(default=3600, ge=0)
+
     # --- agent ---
     # 内网模型响应较慢，超时给的宽松些；过短会导致大量请求被误判为降级
     llm_timeout_ms: int = Field(default=120000, gt=0)

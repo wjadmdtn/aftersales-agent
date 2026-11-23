@@ -52,9 +52,15 @@ CASES_DIR = ROOT / "eval" / "cases"
 REPORT_DIR = ROOT / "eval" / "report"
 BASELINE = ROOT / "eval" / "baseline" / "v1.json"
 
+# turns 里用这个标记代替聊天文本，模拟前端地址表单提交
+ADDRESS_FORM_TURN = "@address_form"
+
 
 class InProcessMock(MockServiceClient):
     def __init__(self, app):
+        # 不调 super().__init__ 就拿不到 timeout_ms / base_url，
+        # 没被覆写的方法（如 create_urge）会当场 AttributeError
+        super().__init__(base_url="http://mock")
         self._t = ASGITransport(app=app)
 
     async def _get(self, path: str, *, trace_id: str):
@@ -67,6 +73,14 @@ class InProcessMock(MockServiceClient):
             r = await c.post(
                 f"/orders/{order_id}/refund",
                 json={"amount": str(amount)},
+                headers={"X-Trace-Id": trace_id, "X-Request-Id": request_id},
+            )
+            return r.json()
+
+    async def create_urge(self, order_id, *, request_id, trace_id):
+        async with AsyncClient(transport=self._t, base_url="http://mock") as c:
+            r = await c.post(
+                f"/orders/{order_id}/urge",
                 headers={"X-Trace-Id": trace_id, "X-Request-Id": request_id},
             )
             return r.json()
@@ -257,6 +271,26 @@ async def run_case(client, mock_app, case: EvalCase, trace: str) -> dict:
         # 只查最终状态测不出"AI 有没有让用户确认"这类流程约束。
         transcript = []
         for turn in case.turns or []:
+            if turn == ADDRESS_FORM_TURN:
+                # 地址表单提交：走与前端表单同一条后端入口，不是发一句聊天文本。
+                # 这样用例才真的覆盖"结构化地址 → 确认卡 → 写入"这段。
+                from app.api.agent_routes import get_loop
+
+                reply = await get_loop().submit_address(
+                    session_id=f"eval-{case.id}",
+                    user_id="u1",
+                    address=case.expect.get("address") or {},
+                    trace_id=trace,
+                )
+                transcript.append(
+                    {
+                        "state": reply.state,
+                        "intent": reply.intent.value if reply.intent else None,
+                        "reply": reply.reply,
+                        "tool_calls": reply.tool_calls or [],
+                    }
+                )
+                continue
             r = await client.post(
                 "/agent/chat",
                 json={"session_id": f"eval-{case.id}", "user_id": "u1", "message": turn, "order_id": order_id},
@@ -272,9 +306,12 @@ async def run_case(client, mock_app, case: EvalCase, trace: str) -> dict:
                 }
             )
         order = (await client.get(f"/orders/{order_id}", headers={"X-Trace-Id": trace})).json()
+        data = order.get("data") or {}
         return {
-            "order_status": (order.get("data") or {}).get("status"),
-            "refund_count": 1 if (order.get("data") or {}).get("status") == OrderStatus.REFUNDED.value else 0,
+            "order_status": data.get("status"),
+            "refund_count": 1 if data.get("status") == OrderStatus.REFUNDED.value else 0,
+            # 业务结果不能只看状态：改地址失败时状态仍是 PAID，只有地址能证明有没有改成功
+            "address": data.get("address"),
             "last_reply": transcript[-1]["reply"] if transcript else None,
             "turns": transcript,
         }
@@ -379,6 +416,17 @@ async def main_async(args) -> int:
         cases = [c for c in cases if c.path.value in wanted]
         if not cases:
             print(f"没有匹配的用例路径：{args.only}")
+            return 1
+    if args.ids:
+        wanted = {x.strip() for x in args.ids.split(",") if x.strip()}
+        cases = [c for c in cases if c.id in wanted]
+        # 静默少跑比跑错更糟：ID 打错时应该立刻知道，而不是得到一个空报告
+        missing = wanted - {c.id for c in cases}
+        if missing:
+            print(f"找不到这些用例 ID：{', '.join(sorted(missing))}")
+            return 1
+        if not cases:
+            print("没有匹配的用例 ID")
             return 1
     if args.limit:
         cases = cases[: args.limit]
@@ -495,6 +543,11 @@ def main() -> int:
         "--only",
         default=None,
         help="只跑指定路径，逗号分隔：e2e,policy,clarify,handoff,irrelevant,business_action",
+    )
+    p.add_argument(
+        "--ids",
+        default=None,
+        help="只跑指定用例 ID，逗号分隔。用于复现某几条失败样本，配 --concurrency=4 秒级出结果",
     )
     p.add_argument(
         "--no-open",

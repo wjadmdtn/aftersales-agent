@@ -26,6 +26,15 @@ class InProcessMockClient(MockServiceClient):
             r.raise_for_status()
             return r.json()
 
+    async def create_urge(self, order_id, *, request_id, trace_id):
+        async with AsyncClient(transport=self._transport, base_url="http://mock") as c:
+            r = await c.post(
+                f"/orders/{order_id}/urge",
+                headers={"X-Trace-Id": trace_id, "X-Request-Id": request_id},
+            )
+            r.raise_for_status()
+            return r.json()
+
     async def create_refund(self, order_id, amount, *, request_id, trace_id):
         async with AsyncClient(transport=self._transport, base_url="http://mock") as c:
             r = await c.post(
