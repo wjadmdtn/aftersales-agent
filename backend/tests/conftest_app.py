@@ -65,6 +65,11 @@ def prod_app(monkeypatch, fake_redis_for_prod):
 
     monkeypatch.setattr(settings, "llm_base_url", "", raising=False)
     monkeypatch.setattr(settings, "policy_enabled", False, raising=False)
+    # 这些用例验证的是业务流程，不是限流策略。阈值放大到实际不可达，
+    # 限流本身由 tests/integration/test_ws_ratelimit.py 单独覆盖。
+    monkeypatch.setattr(settings, "ws_inbound_rate_limit", 10_000, raising=False)
+    monkeypatch.setattr(settings, "ws_sustained_rate_limit", 10_000, raising=False)
+    monkeypatch.setattr(settings, "ws_message_max_chars", 10_000, raising=False)
     mock_routes.reset_store()
     agent_routes._loop = None
     handoff_routes._coordinator = None

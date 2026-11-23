@@ -93,8 +93,19 @@ class Settings(BaseSettings):
     ws_idle_timeout_s: int = Field(default=60, gt=0)
     ws_reconnect_base_s: float = Field(default=1.0, gt=0)
     ws_reconnect_max_s: float = Field(default=30.0, gt=0)
-    ws_inbound_rate_limit: int = Field(default=10, ge=1)
+    ws_inbound_rate_limit: int = Field(default=3, ge=1)
     ws_inbound_rate_window_s: int = Field(default=5, gt=0)
+    # 两层限流：突发挡脚本连发，持续挡长时间刷单。
+    # 正常客服对话间隔 6-15 秒，两层都碰不到。
+    ws_sustained_rate_limit: int = Field(default=20, ge=1)
+    ws_sustained_rate_window_s: int = Field(default=60, gt=0)
+    # 单条消息字符上限。评测最长用例 27 字，客服真实消息 99% 在 100 字内；
+    # 不设上限时一条 10 万字的消息会整段进 prompt 直接烧钱。
+    ws_message_max_chars: int = Field(default=500, ge=1)
+    # 部署在反向代理后面时必须打开，否则拿到的是代理 IP，
+    # 所有用户共用一个 IP 限流额度，会互相误伤。
+    # 默认关闭：直接暴露公网时 X-Forwarded-For 可被伪造，信它等于没限流。
+    trust_forwarded_for: bool = False
     # 与 session_ttl_seconds 同寿命：会话过期后消息不应比会话活得更久
     chat_message_ttl_seconds: int = Field(default=86400, gt=0)
     # 空闲超时：超过这么久没有问答，本次会话即结束（人工状态一并关掉）。

@@ -15,6 +15,7 @@ import re
 
 from app.chat.hub import Connection
 from app.chat.protocol import Envelope, MessageType, Role, envelope
+from app.chat.ratelimit import check_message_rates
 from app.chat.runtime import get_chat
 from app.config import settings
 from app.models.handoff import HandoffState
@@ -23,6 +24,22 @@ logger = logging.getLogger(__name__)
 
 # 按句末标点切块；保留标点，拼接后与原文一致
 _SENTENCE_END = re.compile(r"(?<=[。！？；\n])")
+
+
+def _client_ip(conn: Connection) -> str | None:
+    """取客户端 IP，给用户级限流做兜底。
+
+    user_id 是客户端自报的，换一个就绕过用户层限流，所以还要按 IP 限一层。
+    测试里的 ws 是 mock 对象，没有 client，取不到就不做 IP 限流。
+    """
+    if settings.trust_forwarded_for:
+        headers = getattr(conn.ws, "headers", None)
+        fwd = headers.get("x-forwarded-for") if headers is not None else None
+        if fwd:
+            # 取第一跳：后面的是代理链地址
+            return fwd.split(",")[0].strip() or None
+    client = getattr(conn.ws, "client", None)
+    return getattr(client, "host", None) or None
 
 
 def split_chunks(text: str) -> list[str]:
@@ -112,6 +129,42 @@ async def handle_user_message(conn: Connection, frame: Envelope) -> None:
     local_id = (frame.payload or {}).get("local_id")
 
     if not text:
+        return
+
+    # 长度上限：超长消息会整段进 prompt，一条就能烧掉大量 token
+    if len(text) > settings.ws_message_max_chars:
+        conn.send(
+            envelope(
+                MessageType.ERROR,
+                session_id=session_id,
+                payload={
+                    "code": "message_too_long",
+                    "message": f"消息太长了，请控制在 {settings.ws_message_max_chars} 字以内",
+                    "retryable": True,
+                },
+            )
+        )
+        return
+
+    # 限流必须在落库与调模型之前：被限的消息不该产生任何成本
+    ip = _client_ip(conn)
+    allowed, wait = await check_message_rates(
+        rt.messages.redis,
+        user_key=f"rl:u:{conn.user_id or 'anon'}",
+        ip_key=f"rl:ip:{ip}" if ip else None,
+    )
+    if not allowed:
+        conn.send(
+            envelope(
+                MessageType.ERROR,
+                session_id=session_id,
+                payload={
+                    "code": "rate_limited",
+                    "message": f"您发送得有点快，请 {wait} 秒后再试",
+                    "retryable": True,
+                },
+            )
+        )
         return
 
     # 空闲超时：5 分钟没问答视为上次会话已结束，本条消息开新会话。

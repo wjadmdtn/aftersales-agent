@@ -187,8 +187,10 @@ function handleFrame(env: Envelope<any>) {
     case 'error': {
       // 出错时清掉等待占位，否则界面会永远停在"正在输入"
       pending.value = null
-      if (env.payload.code === 'rate_limited') notice.value = '发送太快了，请稍后再试'
-      else notice.value = env.payload.message ?? '出错了'
+      // 后端会带上具体等待秒数或字数上限，直接展示比自己编文案更准
+      if (env.payload.code === 'rate_limited' || env.payload.code === 'message_too_long') {
+        notice.value = env.payload.message ?? '发送太快了，请稍后再试'
+      } else notice.value = env.payload.message ?? '出错了'
       break
     }
     default:

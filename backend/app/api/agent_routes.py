@@ -7,7 +7,7 @@ from decimal import Decimal
 from typing import Any
 
 from fastapi import APIRouter, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.agent.intent import IntentClassifier
 from app.agent.loop import AgentLoop
@@ -29,6 +29,16 @@ class ChatRequest(BaseModel):
     session_id: str = Field(min_length=1)
     user_id: str = Field(min_length=1)
     message: str = Field(min_length=1)
+
+    @field_validator("message")
+    @classmethod
+    def _within_limit(cls, v: str) -> str:
+        """与 WS 侧共用同一个上限：超长文本会整段进 prompt。"""
+        from app.config import settings
+
+        if len(v) > settings.ws_message_max_chars:
+            raise ValueError(f"message 超过 {settings.ws_message_max_chars} 字")
+        return v
     order_id: str | None = None
     snapshot: SnapshotIn | None = None
 
