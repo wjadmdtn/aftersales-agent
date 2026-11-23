@@ -15,17 +15,25 @@ def business(
     category: str,
     text: str,
     intent: str,
-    mode: str = "execute",
+    mode: str | None = "execute",
     order_id: str = "ORD1002",
     notes: str | None = None,
 ) -> EvalCase:
+    """mode=None 表示不校验 mode。
+
+    问规则类用例只关心意图（policy），mode 由语义决定且不是重点，
+    写死 execute 会让用例去判一件不该判的事。
+    """
+    expect = {"intent": intent}
+    if mode is not None:
+        expect["mode"] = mode
     return EvalCase(
         id=cid,
         category=category,
         path=EvalPath.BUSINESS_ACTION,
         input=text,
         context={"order_id": order_id},
-        expect={"intent": intent, "mode": mode},
+        expect=expect,
         notes=notes,
     )
 

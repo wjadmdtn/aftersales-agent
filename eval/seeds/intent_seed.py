@@ -119,8 +119,9 @@ ADVERSARIAL = [
     (("我下单三天了物流一直不更新，查一下"), "logistics"),
     (("收货地址写成了老家，能改吗"), "change_address", "inquiry"),
     (("这个订单我需要退款处理一下"), "refund"),
-    (("快递显示签收了但我没收到"), "logistics"),
-    (("订单状态一直是待发货"), "query_order"),
+    (("快递显示签收了但我没收到"), "policy", "inquiry"),
+    # 抱怨没发货问的是"多久能发"，不是"现在到哪了"，更不是要催单
+    (("订单状态一直是待发货"), "policy", None),
 ]
 
 # ---------- 无关键词但有明确诉求 20 条 ----------
@@ -149,6 +150,19 @@ NO_KEYWORD = [
     (("买错了"), "refund", "inquiry"),
     (("我要把东西寄回去"), "refund"),
     (("包裹一直没动静"), "logistics"),
+]
+
+
+# ---------- 催发货 6 条 ----------
+# 只有祈使句（帮我催一下）才判 urge_shipment——那是真的去调写接口。
+# 抱怨、问时效、问规则都是 policy：用户没要求执行，系统不能替他动业务系统。
+URGE = [
+    ("urge-ok-00", "standard", "帮我催一下", "urge_shipment", "execute"),
+    ("urge-ok-01", "adversarial", "催催我的订单", "urge_shipment", "execute"),
+    ("urge-ok-02", "adversarial", "催一下发货吧", "urge_shipment", "execute"),
+    ("urge-query-00", "standard", "怎么还不发货", "policy", None),
+    ("urge-inquiry-00", "standard", "能催发货吗", "policy", None),
+    ("urge-boundary-00", "standard", "超时没发货有赔偿吗", "policy", None),
 ]
 
 
@@ -224,6 +238,11 @@ def build() -> list:
             business(
                 f"intent-nokw-{i:02d}", category="no_keyword", text=text, intent=intent, mode=mode
             )
+        )
+
+    for cid, category, text, intent, mode in URGE:
+        cases.append(
+            business(cid, category=category, text=text, intent=intent, mode=mode)
         )
 
     return cases

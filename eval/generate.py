@@ -19,11 +19,11 @@ CASES_DIR = ROOT / "eval" / "cases"
 
 # spec 约定的分布
 EXPECTED = {
-    "business_action": {"standard": 55, "adversarial": 32, "no_keyword": 20},
+    "business_action": {"standard": 59, "adversarial": 34, "no_keyword": 20},
     "clarify": {"with_emotion": 25, "no_emotion": 15},
     "irrelevant": {"irrelevant": 20},
     "handoff": {"handoff": 30},
-    "e2e": {"e2e": 60},
+    "e2e": {"e2e": 61},
     "policy": {"policy": 30},
 }
 
