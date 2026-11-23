@@ -57,6 +57,55 @@ const inputDisabled = computed(
   () => uiState.value === 'queued' || uiState.value === 'resolved',
 )
 
+// 后端在「要改地址」时回 need_address，这里弹出结构化表单。
+// 地址不回填自由文本解析——文本里抽省市区一定出错，抽错就是把货寄错地方。
+const agentState = ref<string | null>(null)
+const showAddressForm = computed(
+  () =>
+    agentState.value === 'need_address' &&
+    uiState.value === 'ai_serving' &&
+    !idleExpired.value,
+)
+const addressForm = ref({
+  receiver: '',
+  phone: '',
+  province: '',
+  city: '',
+  district: '',
+  detail: '',
+})
+const addressError = ref('')
+
+function submitAddress() {
+  const a = addressForm.value
+  const fields = [a.receiver, a.phone, a.province, a.city, a.district, a.detail]
+  if (fields.some((x) => !x.trim())) {
+    addressError.value = '请填写完整的收货信息'
+    return
+  }
+  if (!/^\d{6,20}$/.test(a.phone.trim())) {
+    addressError.value = '手机号格式不正确'
+    return
+  }
+  if (!socket) return
+  addressError.value = ''
+  socket.send({
+    type: 'user.address',
+    payload: {
+      address: {
+        receiver: a.receiver.trim(),
+        phone: a.phone.trim(),
+        province: a.province.trim(),
+        city: a.city.trim(),
+        district: a.district.trim(),
+        detail: a.detail.trim(),
+      },
+    },
+  })
+  // 收起表单，等后端回确认卡；地址写错了重新说"改地址"还能再弹一次
+  agentState.value = null
+}
+
 const placeholder = computed(() => {
   if (idleExpired.value) return '会话已结束，发送消息可开始新会话'
   if (uiState.value === 'queued') return '正在为您接入，请稍候'
@@ -113,6 +162,8 @@ function handleFrame(env: Envelope<any>) {
       pending.value = null
       resetIdleTimer()
       degraded.value = Boolean(p.degraded)
+      // 后端阶段名（need_address 等）驱动表单展示
+      agentState.value = p.state ?? null
       const msg: ChatMessage = {
         id: p.msg_id,
         session_id: env.session_id ?? sessionId.value,
@@ -299,6 +350,35 @@ onBeforeUnmount(() => {
     <div v-if="idleNotice" class="notice notice--idle" data-test="idle-ended">{{ idleNotice }}</div>
     <div v-if="notice" class="notice">{{ notice }}</div>
 
+    <form
+      v-if="showAddressForm"
+      class="address-form"
+      data-test="address-form"
+      @submit.prevent="submitAddress"
+    >
+      <div class="address-form__title">请填写新的收货信息</div>
+      <div class="address-form__row">
+        <el-input v-model="addressForm.receiver" placeholder="收件人" data-test="addr-receiver" />
+        <el-input v-model="addressForm.phone" placeholder="手机号" data-test="addr-phone" />
+      </div>
+      <div class="address-form__row">
+        <el-input v-model="addressForm.province" placeholder="省" data-test="addr-province" />
+        <el-input v-model="addressForm.city" placeholder="市" data-test="addr-city" />
+        <el-input v-model="addressForm.district" placeholder="区/县" data-test="addr-district" />
+      </div>
+      <el-input
+        v-model="addressForm.detail"
+        placeholder="详细地址（街道、门牌号）"
+        data-test="addr-detail"
+      />
+      <div v-if="addressError" class="address-form__error" data-test="addr-error">
+        {{ addressError }}
+      </div>
+      <el-button type="primary" native-type="submit" data-test="addr-submit">
+        提交地址
+      </el-button>
+    </form>
+
     <footer>
       <el-input
         v-model="input"
@@ -354,5 +434,28 @@ footer {
   gap: 8px;
   padding: 12px 16px;
   border-top: 1px solid #ebeef5;
+}
+.address-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid #ebeef5;
+  background: #fafafa;
+}
+.address-form__title {
+  font-size: 13px;
+  color: #606266;
+}
+.address-form__row {
+  display: flex;
+  gap: 8px;
+}
+.address-form__error {
+  font-size: 12px;
+  color: #f56c6c;
+}
+.address-form :deep(.el-button) {
+  align-self: flex-start;
 }
 </style>

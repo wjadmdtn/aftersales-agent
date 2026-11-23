@@ -35,6 +35,8 @@ def test_all_message_types_declared():
         "pong",
         "error",
         "user.message.ack",
+        # 地址表单提交
+        "user.address",
     }
     assert {t.value for t in MessageType} == expected
 

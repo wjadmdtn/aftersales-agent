@@ -256,6 +256,81 @@ async def handle_user_handoff(conn: Connection, frame: Envelope) -> None:
         )
 
 
+async def handle_user_address(conn: Connection, frame: Envelope) -> None:
+    """地址表单提交。
+
+    地址只认表单给的结构化字段，不做自由文本解析：从"改到朝阳区建国路4号"
+    这类文本里抽省市区，抽错就是把货寄到错误地址。字段不全直接打回，
+    让用户补齐，而不是拿残缺数据生成一张空摘要的确认卡。
+    """
+    from pydantic import ValidationError
+
+    from app.api.agent_routes import get_loop
+    from app.models.domain import Address
+    from app.observability.trace import new_trace_id
+
+    session_id = conn.session_id
+    assert session_id is not None
+    rt = get_chat()
+    state = await rt.registry.get(session_id)
+
+    if state is not None and state.state is HandoffState.RESOLVED:
+        conn.send(
+            envelope(
+                MessageType.ERROR,
+                session_id=session_id,
+                payload={"code": "session_resolved", "message": "会话已结束", "retryable": False},
+            )
+        )
+        return
+
+    raw = (frame.payload or {}).get("address") or {}
+    try:
+        address = Address.model_validate(raw)
+    except ValidationError:
+        conn.send(
+            envelope(
+                MessageType.ERROR,
+                session_id=session_id,
+                payload={
+                    "code": "bad_address",
+                    "message": "地址信息不完整，请检查收件人、手机号、省市区和详细地址",
+                    "retryable": True,
+                },
+            )
+        )
+        return
+
+    try:
+        reply = await get_loop().submit_address(
+            session_id=session_id,
+            user_id=conn.user_id or "u",
+            address=address.model_dump(mode="json"),
+            trace_id=new_trace_id(),
+        )
+    except Exception:
+        logger.exception("submit address failed session=%s", session_id)
+        conn.send(
+            envelope(
+                MessageType.ERROR,
+                session_id=session_id,
+                payload={"code": "server_busy", "message": "系统繁忙，请重试", "retryable": True},
+            )
+        )
+        return
+
+    await stream_reply(
+        conn,
+        session_id,
+        reply.reply,
+        meta={
+            "intent": reply.intent.value if reply.intent else None,
+            "state": reply.state,
+            "tool_calls": reply.tool_calls,
+        },
+    )
+
+
 async def handle_agent_message(conn: Connection, frame: Envelope) -> None:
     """人工发消息：必须是自己接入的会话且处于人工服务中。"""
     rt = get_chat()

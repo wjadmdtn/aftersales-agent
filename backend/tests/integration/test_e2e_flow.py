@@ -78,24 +78,59 @@ async def test_logistics_read_flow(chat):
 
 
 async def test_change_address_without_new_address_asks_first(chat, env):
-    """没说新地址就不弹确认——否则用户确认的是个空地址，服务端必拒。"""
+    """改地址一律引导到表单：不从自由文本里抽地址。"""
     r = await chat("我要改地址", order="ORD1002")
     assert r["intent"] == Intent.CHANGE_ADDRESS
     assert r["state"] == "need_address"
-    assert "新的收货人" in r["reply"]
+    assert "收货信息" in r["reply"]
 
     order = (await env["mock_client"].get("/orders/ORD1002")).json()
     assert order["data"]["address"]["receiver"] != ""
 
 
-async def test_change_address_with_address_shows_confirmation(chat, env):
-    """带了地址信息才弹确认，且确认文案里能看到地址内容。"""
-    r = await chat("我要改成别的地址", order="ORD1002")
-    assert r["state"] == "need_address"
+async def test_change_address_text_does_not_build_confirmation(chat, env):
+    """用户把地址写在聊天里也不生成确认卡。
 
-    r2 = await chat("改为北京市朝阳区建国路4号 13800138000", order="ORD1002")
-    assert r2["state"] == "awaiting_confirmation"
-    assert "确认" in r2["reply"]
+    这条是回归护栏：旧实现会把整段文本塞进 payload.address，
+    确认卡摘要拼出空字符串，执行时服务端 422。
+    """
+    await chat("我要改地址", order="ORD1002")
+    r = await chat("改为北京市朝阳区建国路4号 13800138000", order="ORD1002")
+    assert r["state"] == "need_address"
+    assert "awaiting_confirmation" not in r["state"]
+
+
+async def test_submit_address_full_flow_writes_order(chat, env):
+    """表单地址 → 确认卡带完整地址 → 确认后订单地址真的变了。"""
+    from app.api.agent_routes import get_loop
+
+    await chat("我要改地址", order="ORD1002")
+    loop = get_loop()
+    reply = await loop.submit_address(
+        session_id="s1",
+        user_id="u1",
+        address={
+            "receiver": "张三",
+            "phone": "13800138000",
+            "province": "北京市",
+            "city": "北京市",
+            "district": "朝阳区",
+            "detail": "建国路4号",
+        },
+        trace_id="t-addr-1",
+    )
+    assert reply.state == "awaiting_confirmation"
+    # 确认卡必须显示真实地址，不能是空白
+    assert "建国路4号" in reply.reply
+
+    r = await chat("确认", order="ORD1002")
+    assert r["state"] in ("executed", "done")
+
+    order = (await env["mock_client"].get("/orders/ORD1002")).json()
+    addr = order["data"]["address"]
+    assert addr["receiver"] == "张三"
+    assert addr["district"] == "朝阳区"
+    assert addr["detail"] == "建国路4号"
 
 
 async def test_exchange_gives_self_service_path(chat, env):

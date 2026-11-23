@@ -18,6 +18,17 @@ from __future__ import annotations
 
 from eval.seeds.common import e2e
 
+# turns 里的占位：模拟前端地址表单提交，runner 会走 submit_address 而不是发聊天文本
+ADDRESS_FORM = "@address_form"
+FORM_ADDRESS = {
+    "receiver": "张三",
+    "phone": "13800138000",
+    "province": "北京市",
+    "city": "北京市",
+    "district": "朝阳区",
+    "detail": "建国路4号",
+}
+
 
 def build() -> list:
     cases: list = []
@@ -75,19 +86,24 @@ def build() -> list:
 
     # ---------- F. 改地址（6 条）----------
     add("e2e-ad-ok-00", ["我要改地址"], "PAID",
-        note="没说新地址：先追问，不弹空地址确认",
+        note="改地址一律引导到表单，不弹空确认",
         first_turn_state="need_address", never_state="awaiting_confirmation",
-        must_say=["收货人"])
-    add("e2e-ad-ok-01", ["我要改地址", "改为北京市朝阳区建国路4号 13800138000"], "PAID",
-        note="给地址后弹确认，确认前不得写入",
-        first_turn_state="need_address", last_turn_state="awaiting_confirmation")
-    add("e2e-ad-shipped-00", ["我要改地址", "改为北京市朝阳区建国路4号 13800138000"], "SHIPPED", order="ORD1003",
-        note="已发货不可改，状态不变，也不得执行修改",
+        must_say=["收货信息"])
+    add("e2e-ad-ok-01", ["我要改地址", ADDRESS_FORM, "确认"], "PAID",
+        note="表单提交结构化地址 → 确认卡带真实地址 → 确认后写入成功",
+        first_turn_state="need_address", last_turn_state="executed",
+        address=FORM_ADDRESS)
+    add("e2e-ad-shipped-00", ["我要改地址", ADDRESS_FORM], "SHIPPED", order="ORD1003",
+        note="已发货：提交表单也要被拒，地址不变",
         never_state="executed")
-    add("e2e-ad-shipped-01", ["收货地址填错了", "改为北京市朝阳区建国路4号 13800138000"], "SHIPPED", order="ORD1003",
+    add("e2e-ad-shipped-01", ["收货地址填错了", ADDRESS_FORM], "SHIPPED", order="ORD1003",
         note="已发货，换种说法同样被拒")
-    add("e2e-ad-delivered-00", ["我要改地址", "改为北京市朝阳区建国路4号 13800138000"], "DELIVERED", order="ORD1004",
+    add("e2e-ad-delivered-00", ["我要改地址", ADDRESS_FORM], "DELIVERED", order="ORD1004",
         note="已签收不可改")
+    add("e2e-ad-text-00", ["我要改地址", "地址改成北京市朝阳区建国路4号 13800138000"], "PAID",
+        note="地址写在聊天里也不猜：仍回表单，不生成确认卡",
+        first_turn_state="need_address", last_turn_state="need_address",
+        never_state="awaiting_confirmation")
     add("e2e-ad-inquiry-00", ["能改地址吗"], "PAID",
         note="问能不能改：查这一单的状态后回答，不查政策库、不执行",
         never_state="awaiting_confirmation", must_call=["order.get"],

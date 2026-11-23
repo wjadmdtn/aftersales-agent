@@ -186,6 +186,14 @@ def _grade_e2e(case: EvalCase, actual: dict[str, Any]) -> list[str]:
         if got != expected["refund_count"]:
             failures.append(f"refund_count：期望 {expected['refund_count']}，实际 {got}")
 
+    # 地址变更必须逐字段核对：改地址失败时订单状态仍是 PAID，
+    # 只看状态会让"确认后没改成"这种情况一路绿灯。
+    if expected.get("address"):
+        got = actual.get("address") or {}
+        for field, want in expected["address"].items():
+            if got.get(field) != want:
+                failures.append(f"address.{field}：期望 {want}，实际 {got.get(field)}")
+
     turns = actual.get("turns") or []
 
     # 首轮必须让用户确认，不能直接执行

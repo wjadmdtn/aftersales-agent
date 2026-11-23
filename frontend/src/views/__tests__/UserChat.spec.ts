@@ -229,3 +229,78 @@ describe('会话开场与空闲超时', () => {
     }
   })
 })
+
+describe('UserChat 地址表单', () => {
+  async function latestSocket() {
+    const sock = (await import('@/ws/socket')).Socket as any
+    return sock.instances[sock.instances.length - 1]
+  }
+
+  async function emitNeedAddress(inst: any, state = 'need_address') {
+    inst.opts.onFrame({
+      type: 'assistant.done',
+      session_id: 's1',
+      seq: 5,
+      ts: new Date().toISOString(),
+      payload: {
+        msg_id: 'm1',
+        seq: 5,
+        text: '好的，请填写新的收货信息',
+        state,
+        intent: 'change_address',
+        tool_calls: [],
+        degraded: false,
+      },
+    })
+    await flushPromises()
+  }
+
+  it('need_address 时弹出表单，提交后发出 user.address', async () => {
+    const w = await mountChat()
+    const inst = await latestSocket()
+    await emitNeedAddress(inst)
+    expect(w.find('[data-test="address-form"]').exists()).toBe(true)
+
+    await w.find('[data-test="addr-receiver"]').setValue('张三')
+    await w.find('[data-test="addr-phone"]').setValue('13800138000')
+    await w.find('[data-test="addr-province"]').setValue('北京市')
+    await w.find('[data-test="addr-city"]').setValue('北京市')
+    await w.find('[data-test="addr-district"]').setValue('朝阳区')
+    await w.find('[data-test="addr-detail"]').setValue('建国路4号')
+    await w.find('[data-test="address-form"]').trigger('submit')
+    await flushPromises()
+
+    const sent = inst.sent.filter((f: any) => f.type === 'user.address')
+    expect(sent).toHaveLength(1)
+    expect(sent[0].payload.address).toEqual({
+      receiver: '张三',
+      phone: '13800138000',
+      province: '北京市',
+      city: '北京市',
+      district: '朝阳区',
+      detail: '建国路4号',
+    })
+    // 提交后收起表单，等后端回确认卡
+    expect(w.find('[data-test="address-form"]').exists()).toBe(false)
+  })
+
+  it('字段不全时不发请求', async () => {
+    const w = await mountChat()
+    const inst = await latestSocket()
+    await emitNeedAddress(inst)
+
+    await w.find('[data-test="addr-receiver"]').setValue('张三')
+    await w.find('[data-test="address-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(inst.sent.filter((f: any) => f.type === 'user.address')).toHaveLength(0)
+    expect(w.find('[data-test="addr-error"]').exists()).toBe(true)
+  })
+
+  it('非 need_address 状态不显示表单', async () => {
+    const w = await mountChat()
+    const inst = await latestSocket()
+    await emitNeedAddress(inst, 'inquiry_answered')
+    expect(w.find('[data-test="address-form"]').exists()).toBe(false)
+  })
+})
