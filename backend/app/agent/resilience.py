@@ -21,9 +21,14 @@ class RetryPolicy:
     attempts: int = 3
     base_delay_s: float = 0.2
     multiplier: float = 3.0
+    # 429 是限流，不是抖动：0.2/0.6/1.8 秒的重试全落在同一个限流窗口里，
+    # 三次必然全废，然后整条链路被判降级。限流要等得起。
+    rate_limit_delays: tuple[float, ...] = (1.0, 3.0, 9.0)
 
-    def delay_for(self, attempt: int) -> float:
-        """attempt 从 0 开始。0.2s → 0.6s → 1.8s"""
+    def delay_for(self, attempt: int, *, status: int | None = None) -> float:
+        """attempt 从 0 开始。普通失败 0.2s → 0.6s → 1.8s；429 走 1s → 3s → 9s。"""
+        if status == 429:
+            return self.rate_limit_delays[min(attempt, len(self.rate_limit_delays) - 1)]
         return self.base_delay_s * (self.multiplier**attempt)
 
 
@@ -111,7 +116,9 @@ async def with_retry(fn, *, policy: RetryPolicy | None = None, label: str = "llm
             if getattr(e, "schema", False):
                 break
             if attempt < p.attempts - 1:
-                await asyncio.sleep(p.delay_for(attempt))
+                await asyncio.sleep(
+                    p.delay_for(attempt, status=getattr(e, "status", None))
+                )
 
     stats.record_failure()
     logger.error("%s 重试 %d 次后仍失败，进入降级", label, p.attempts)

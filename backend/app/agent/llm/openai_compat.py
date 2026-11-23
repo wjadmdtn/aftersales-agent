@@ -96,14 +96,19 @@ _SYSTEM_PROMPT = """你是客服意图识别器。判断用户真实诉求，只
 - query_order 管**"这单本身的信息"**：多少钱、买了什么、付款了没、订单号是多少
 - "发货了吗" → logistics（问的是物流环节有没有动），不是 query_order
 
-**催发货既不是查物流，也不是问规则，是 urge_shipment**：
-"帮我催一下""催催我的订单""催一下发货""订单状态一直是待发货""怎么还不发货"
-——诉求是**让商家尽快发货**，系统有专门的动作可执行，必须判 urge_shipment。
-判 logistics 只会回一句"查不到物流信息"，答非所问。
+**urge_shipment 只收"明确要求催单"**：
+"帮我催一下""催催我的订单""帮我催个发货"
+——用户用祈使句要求执行一个动作，系统才去催。这是唯一会写业务系统的场景。
 
-**urge_shipment 与 policy 的边界**：
-- 要求、抱怨、催促（"帮我催""怎么还不发"）→ urge_shipment
-- 问规则、问赔偿（"超时没发货有赔偿吗""平台怎么规定的"）→ policy
+**抱怨、问时效、问规则一律判 policy**：
+"怎么还不发货""订单状态一直是待发货""什么时候能发货""能催发货吗""催了有用吗"
+——这些是在陈述情况或问"多久发、为什么还没发"。答案是发货时效规则
+（默认 48 小时、超时可催、超 72 小时可仅退款），属于 policy。
+提到"发货"不等于要催：判错会让系统替用户做写操作。
+
+**这类也不要判 logistics**：logistics 只回答"东西现在到哪了"，
+抱怨迟迟不发货问的是"多久能发、超时怎么办"，判 logistics 只会回
+一句"查不到物流信息"，答非所问。
 
 **logistics 只覆盖查进度**。以下是问**处理规则**，判 policy（政策库有对应条款）：
 "显示签收但没收到怎么办""包裹丢了怎么处理""运输中破损了怎么办"
@@ -161,8 +166,9 @@ _SYSTEM_PROMPT = """你是客服意图识别器。判断用户真实诉求，只
 
 - 写操作（refund / change_address）**判 execute 要格外谨慎**：用户只是在问就判 inquiry。
   判错会把"能不能退"变成"真的退"，代价是钱。
-- urge_shipment 同样分 mode，但风险低：execute = 真的去催单；query = 只在陈述没发货、
-  问进度，此时不应替用户催单，判 query；inquiry = 问能不能催 / 催了有用吗。
+- urge_shipment 正常只会出现 execute（用户明确要求才判这个意图）。
+  若模型仍给出 query/inquiry，系统只解释不写入——保留这道判断当安全网，
+  宁可少催一次，不可在用户没要求时动业务系统。
 - intent 是 unknown 时 mode 不重要，给 execute 即可。
 
 ## 四、search_query
@@ -180,6 +186,11 @@ intent 不是 policy 时给 null。改写与意图判定同一次完成。
 
 {"intent": "...", "mode": "...", "confidence": 0.0-1.0, "reason": "简短依据", "search_query": "...|null"}
 """
+
+
+def _http_status(e: Exception) -> int | None:
+    """从 httpx 异常里取 HTTP 状态码，供上层区分限流与普通失败。"""
+    return getattr(getattr(e, "response", None), "status_code", None)
 
 
 class OpenAICompatLLMClient:
@@ -298,7 +309,7 @@ class OpenAICompatLLMClient:
             resp.raise_for_status()
             return resp.json()["choices"][0]["message"]["content"]
         except (httpx.HTTPError, KeyError, IndexError, TypeError) as e:
-            raise LLMError(f"llm call failed: {e}") from e
+            raise LLMError(f"llm call failed: {e}", status=_http_status(e)) from e
 
     async def rerank_policy(
         self, *, query: str, clauses: list
@@ -347,7 +358,7 @@ class OpenAICompatLLMClient:
             resp.raise_for_status()
             content = resp.json()["choices"][0]["message"]["content"]
         except (httpx.HTTPError, KeyError, IndexError) as e:
-            raise LLMError(f"llm rerank call failed: {e}") from e
+            raise LLMError(f"llm rerank call failed: {e}", status=_http_status(e)) from e
 
         try:
             data = json.loads(content)
@@ -391,7 +402,7 @@ class OpenAICompatLLMClient:
             resp.raise_for_status()
             content = resp.json()["choices"][0]["message"]["content"]
         except (httpx.HTTPError, KeyError, IndexError) as e:
-            raise LLMError(f"llm policy call failed: {e}") from e
+            raise LLMError(f"llm policy call failed: {e}", status=_http_status(e)) from e
 
         try:
             data = json.loads(content)

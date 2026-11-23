@@ -19,9 +19,13 @@ class LLMError(RuntimeError):
     算成系统故障。
     """
 
-    def __init__(self, message: str = "", *, schema: bool = False):
+    def __init__(
+        self, message: str = "", *, schema: bool = False, status: int | None = None
+    ):
         super().__init__(message)
         self.schema = schema
+        # HTTP 状态码：429 要按限流退避，不能和普通网络抖动用同一套短重试
+        self.status = status
 
 
 @runtime_checkable
