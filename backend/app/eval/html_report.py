@@ -236,8 +236,10 @@ function apply(){{
   }});
   document.getElementById('cnt').textContent = shown;
 }}
-document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{{
-  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+document.querySelectorAll('.tab[data-p]').forEach(t=>t.onclick=()=>{{
+  // 只清路径 tab 的高亮。「只看失败」是独立开关，若一并清掉，
+  // 会出现"按钮看起来关着、过滤其实还开着"的状态错乱。
+  document.querySelectorAll('.tab[data-p]').forEach(x=>x.classList.remove('on'));
   t.classList.add('on'); curPath=t.dataset.p; apply();
 }});
 document.getElementById('q').oninput=e=>{{ q=e.target.value.trim().toLowerCase(); apply(); }};
