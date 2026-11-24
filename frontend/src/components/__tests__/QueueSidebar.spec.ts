@@ -10,7 +10,6 @@ const item = (over: Partial<QueueItem>): QueueItem => ({
   priority_reason: '用户主动要求转人工',
   trigger_type: 'user_request',
   trigger_detail: '',
-  attempted_actions: [],
   suggested_next_step: null,
   primary_intent: 'refund',
   sentiment: 'neutral',

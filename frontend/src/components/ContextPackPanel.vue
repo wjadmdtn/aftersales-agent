@@ -4,25 +4,12 @@ import type { QueueItem } from '@/types'
 
 const props = defineProps<{ item: QueueItem }>()
 
-const TOOL_LABEL: Record<string, string> = {
-  'order.get': '订单',
-  'logistics.get': '物流',
-  'refund.create': '退款',
-  'address.update': '地址',
-  'policy.search': '政策',
-}
-
 const TRIGGER_LABEL: Record<string, string> = {
   user_request: '用户主动要求转人工',
   risk: '风险拦截',
   system_error: '系统异常',
   boundary: 'AI 能力范围外',
 }
-
-const tried = computed(() => {
-  const names = props.item.attempted_actions.map((a) => TOOL_LABEL[a.tool] ?? a.tool)
-  return [...new Set(names)]
-})
 
 // FR-012：风险触发时后端把 suggested_next_step 置空，前端不判断触发类型，
 // 只看有没有值——判定权在后端 context_pack。
@@ -36,12 +23,6 @@ const showSuggestion = computed(() => props.item.suggested_next_step !== null)
     <div class="block">
       <span class="label">摘要</span>
       <p data-test="summary">{{ item.summary }}</p>
-    </div>
-
-    <div class="block">
-      <span class="label">已尝试动作</span>
-      <p v-if="tried.length" data-test="attempted">已查过：{{ tried.join('、') }}</p>
-      <p v-else class="muted" data-test="attempted">尚未调用工具</p>
     </div>
 
     <div class="block">

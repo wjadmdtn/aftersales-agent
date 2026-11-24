@@ -12,6 +12,7 @@ import httpx
 
 from app.agent.llm.base import LLMError
 from app.agent.llm.schema import SchemaError, validate_intent_result
+from app.agent.memory import facts_block, history_messages
 from app.agent.resilience import stats
 from app.config import settings
 from app.models.agent import IntentResult, IntentSource
@@ -234,6 +235,7 @@ class OpenAICompatLLMClient:
         user_input: str,
         hint_keywords: list[str],
         context: dict[str, Any],
+        turns: list[Any] | None = None,
     ) -> IntentResult:
         hint_block = ""
         if hint_keywords:
@@ -242,14 +244,26 @@ class OpenAICompatLLMClient:
                 f"注意它们可能出现在威胁、否定、咨询、历史陈述或转述中，"
                 f"不能据此直接判定诉求。）"
             )
-        ctx_block = ""
-        if context:
-            ctx_block = f"\n\n会话上下文：{json.dumps(context, ensure_ascii=False)}"
 
-        messages: list[dict[str, str]] = [
-            {"role": "system", "content": _SYSTEM_PROMPT},
-            {"role": "user", "content": user_input + hint_block + ctx_block},
-        ]
+        facts_text = facts_block(context.get("facts") if context else None)
+        system_content = _SYSTEM_PROMPT
+        if facts_text:
+            system_content += (
+                "\n\n## 已知事实\n"
+                f"{facts_text}\n"
+                "这些是之前轮次已确认的信息，可直接使用，不必再向用户追问。"
+            )
+
+        # facts 已进 system 段，这里不再重复
+        rest = {k: v for k, v in (context or {}).items() if k != "facts"}
+        ctx_block = ""
+        if rest:
+            ctx_block = f"\n\n会话上下文：{json.dumps(rest, ensure_ascii=False, default=str)}"
+
+        messages: list[dict[str, str]] = [{"role": "system", "content": system_content}]
+        # 历史原文只用于理解指代；意图判定依据是本轮输入与已知事实
+        messages += history_messages(turns)
+        messages.append({"role": "user", "content": user_input + hint_block + ctx_block})
 
         last_error: SchemaError | None = None
         for attempt in range(settings.schema_replay_attempts + 1):

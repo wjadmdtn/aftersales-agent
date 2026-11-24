@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     # 结构不合法时带错误信息重放的次数（不含首次调用）。每加 1 = 多一次模型调用，
     # 内网慢模型单次 20~40 秒，默认只给 1 次；调大等于让用户多等一轮。
     schema_replay_attempts: int = Field(default=1, ge=0, le=3)
+    # ---- 记忆 ----
+    # 最近对话窗口：只用于理解指代，不参与意图判定。纯确认类短消息不占位。
+    memory_enabled: bool = True
+    memory_recent_turns: int = Field(default=6, ge=0, le=20)
+    memory_max_chars: int = Field(default=1500, ge=0)
+    memory_facts_max: int = Field(default=8, ge=0, le=20)
     mock_service_base_url: str = "http://localhost:8000"
 
     # 关键词仅作为提示传给 LLM，不参与意图判定

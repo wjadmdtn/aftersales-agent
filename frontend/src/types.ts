@@ -65,7 +65,6 @@ export interface QueueItem {
   priority_reason: string
   trigger_type: string
   trigger_detail: string
-  attempted_actions: { tool: string; result_status: string; at: string }[]
   suggested_next_step: string | null
   primary_intent: string
   sentiment: string

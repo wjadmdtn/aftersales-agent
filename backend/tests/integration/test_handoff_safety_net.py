@@ -239,7 +239,7 @@ async def test_policy_gap_handoff_carries_boundary_trigger(make_env):
     assert pack.priority is not None
 
 
-async def test_handoff_context_records_attempted_failures(make_env):
+async def test_handoff_context_records_tool_failures(make_env):
     """转人工时 Context Pack 必须带上"已经失败了几次"，人工端据此判断要不要查系统。"""
     loop, _ = make_env(
         fail_actions={"order.get"},

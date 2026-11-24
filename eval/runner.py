@@ -102,11 +102,14 @@ class RecordingLLM:
         self.calls = 0
         self.seconds = 0.0
 
-    async def classify(self, *, user_input, hint_keywords, context):
+    async def classify(self, *, user_input, hint_keywords, context, turns=None):
         start = time.perf_counter()
         try:
             return await self.inner.classify(
-                user_input=user_input, hint_keywords=hint_keywords, context=context
+                user_input=user_input,
+                hint_keywords=hint_keywords,
+                context=context,
+                turns=turns,
             )
         finally:
             self.calls += 1

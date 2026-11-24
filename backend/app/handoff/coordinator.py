@@ -15,7 +15,6 @@ from app.handoff.emotion import detect_emotion
 from app.handoff.queue import HandoffQueue
 from app.handoff.state import assert_ai_may_speak
 from app.models.handoff import (
-    AttemptedAction,
     HandoffState,
     ToolStatus,
     TriggerResult,
@@ -94,7 +93,6 @@ class HandoffCoordinator:
         primary_intent: str,
         trigger: TriggerResult,
         order_id: str | None = None,
-        attempted: list[AttemptedAction] | None = None,
         refund_amount: Decimal | None = None,
         current_state: HandoffState = HandoffState.NORMAL,
     ) -> HandoffOutcome:
@@ -110,7 +108,6 @@ class HandoffCoordinator:
             last_user_message=user_message,
             emotion=emotion,
             trigger=trigger,
-            attempted=attempted,
             refund_amount=refund_amount,
             cfg=self.cfg,
         )

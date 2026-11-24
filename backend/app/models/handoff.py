@@ -46,12 +46,6 @@ class ToolStatus(StrEnum):
     TIMEOUT = "TIMEOUT"
 
 
-class AttemptedAction(BaseModel):
-    tool: str
-    result_status: ToolStatus
-    at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-
 class TurnSignals(BaseModel):
     """触发判定需要的全部信号。纯数据，判定函数是纯函数。"""
 
@@ -88,7 +82,6 @@ class HandoffContext(BaseModel):
     order_id: str | None = None
 
     summary: str = Field(max_length=120)
-    attempted_actions: list[AttemptedAction] = Field(default_factory=list)
 
     primary_intent: str
     sentiment: Emotion

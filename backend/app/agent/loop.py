@@ -21,7 +21,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 
-from app.agent import degrade, present
+from app.agent import degrade, memory, present
 from app.agent.confirm import (
     Action,
     build_confirmation,
@@ -32,6 +32,7 @@ from app.agent.confirm import (
 from app.agent.intent import IntentClassifier
 from app.agent.session import SessionStore, snapshot_mismatch
 from app.agent.tools.client import MockServiceClient
+from app.config import settings
 from app.models.agent import (
     READ_INTENTS,
     IntentMode,
@@ -133,6 +134,20 @@ class AgentLoop:
             if snapshot is not None:
                 state.snapshot = snapshot
 
+        reply = await self._handle_inner(state, message=message, trace_id=trace_id)
+        await self._remember(state, message, reply)
+        await self.sessions.save(state)
+        return reply
+
+    async def _handle_inner(
+        self,
+        state,
+        *,
+        message: str,
+        trace_id: str,
+    ) -> AgentReply:
+        session_id = state.session_id
+
         # ---- 1. 有待确认操作时，先处理确认回复 ----
         pending = await self.sessions.get_pending(session_id)
         if pending is not None:
@@ -168,7 +183,12 @@ class AgentLoop:
         # ---- 3. 每次都先调 LLM ----
         outcome = await self.classifier.classify_detailed(
             message,
-            context={"order_id": state.order_id, "intent": state.intent},
+            context={
+                "order_id": state.order_id,
+                "intent": state.intent,
+                "facts": state.facts,
+            },
+            turns=state.recent_turns,
         )
         result, error = outcome.result, outcome.error
 
@@ -224,6 +244,33 @@ class AgentLoop:
         await self.sessions.save(state)
         return reply
 
+    async def _remember(self, state, message: str, reply: AgentReply) -> None:
+        """把本轮写进会话记忆。
+
+        原文窗口只用于理解指代；事实跨轮保留，不受窗口裁剪影响——
+        窗口裁掉的是"怎么说的"，留下的是"说了什么"。
+        """
+        if not settings.memory_enabled:
+            return
+
+        state.facts = memory.merge_facts(
+            state.facts,
+            memory.extract_facts(message, state.facts),
+            limit=settings.memory_facts_max,
+        )
+        # 诉求以本轮意图识别结果为准；未识别出来时保留上一次的，不覆盖成 unknown
+        if state.intent is not None and state.intent.value != "unknown":
+            state.facts[memory.FACT_ISSUE] = state.intent.value
+
+        kw = {
+            "max_turns": settings.memory_recent_turns,
+            "max_chars": settings.memory_max_chars,
+        }
+        state.recent_turns = memory.append_turn(state.recent_turns, "user", message, **kw)
+        state.recent_turns = memory.append_turn(
+            state.recent_turns, "assistant", getattr(reply, "reply", "") or "", **kw
+        )
+
     def _pending_bypassed(self, pending: PendingConfirmation, message: str) -> bool:
         """用户这句是不是在"另起炉灶"，还是在回答确认卡。
 
@@ -271,6 +318,37 @@ class AgentLoop:
                 "_transport_error": True,
             }
         return self._note_tool(state, body)
+
+    async def _call_write_with_retry(self, coro_factory, state: SessionState) -> dict:
+        """写操作：系统级失败（传输/4xxx）时用同一 request_id 幂等重试一次。
+
+        重试用的是确认卡上定稿的 request_id，所以即使第一次其实已成功，
+        第二次也会命中幂等、返回首次结果，把"结果未知"自动消解掉。
+        仍失败则由调用方决定转人工。
+        """
+        body = await self._call(coro_factory, state)
+        if tool_failed(body):
+            logger.warning("write tool failed, idempotent retry: code=%s", body.get("code"))
+            body = await self._call(coro_factory, state)
+        return body
+
+    async def _handoff_write_uncertain(
+        self, state: SessionState, pending: PendingConfirmation, *, trace_id: str
+    ) -> AgentReply:
+        """写操作重试仍失败：结果不确定，立即转人工，不等下一轮。"""
+        # 待退金额在 confirm 阶段已清零；这里补回去，供转人工判风险优先级
+        if pending.amount is not None:
+            state.pending_refund_amount = pending.amount
+        kind = "退款提交" if pending.action == Action.REFUND.value else "地址修改"
+        outcome = await self._handoff(
+            state,
+            pending.summary,
+            primary_intent=pending.action,
+            trace_id=trace_id,
+            forced_detail=f"{kind}结果未知（下游超时/异常），需人工核实",
+        )
+        outcome.reply = f"{kind}结果暂时未知，正在为您转接人工核实，请稍候。"
+        return outcome
 
     def _exhausted(self, state: SessionState, message: str) -> bool:
         """是否已进入"该因系统持续异常而转人工"的状态。
@@ -1030,24 +1108,20 @@ class AgentLoop:
                     state="write_rejected",
                 )
 
-            body = await self._call(
-                lambda: self.tools.create_refund(
+            def _do_refund():
+                return self.tools.create_refund(
                     pending.order_id,
                     pending.amount or Decimal("0"),
                     # 幂等键用确认卡上定稿的那把：同一张卡不管重试多少次都是同一个请求，
                     # 业务侧按 (action, request_id) 的去重才真正生效。
                     request_id=pending.request_id or f"refund:{pending.order_id}",
                     trace_id=trace_id,
-                ),
-                state,
-            )
-            if body.get("_transport_error"):
-                # 结果未知不能说"已退款"，也不能说"没退"——两句话都可能骗用户
-                return AgentReply(
-                    reply="退款结果暂时未知，请稍后在订单里确认，或点「转人工」核实。",
-                    tool_calls=["order.get", "refund.create"],
-                    state="execute_uncertain",
                 )
+
+            body = await self._call_write_with_retry(_do_refund, state)
+            if tool_failed(body):
+                # 幂等重试仍系统级失败：结果不确定，立即转人工（不等下一轮）
+                return await self._handoff_write_uncertain(state, pending, trace_id=trace_id)
             return AgentReply(
                 reply=present.render(body),
                 tool_calls=["order.get", "refund.create"],
@@ -1066,21 +1140,17 @@ class AgentLoop:
                 state="write_rejected",
             )
 
-        body = await self._call(
-            lambda: self.tools.update_address(
+        def _do_address():
+            return self.tools.update_address(
                 pending.order_id,
                 pending.payload.get("address", {}),
                 trace_id=trace_id,
                 request_id=pending.request_id,
-            ),
-            state,
-        )
-        if body.get("_transport_error"):
-            return AgentReply(
-                reply="地址修改结果暂时未知，请稍后在订单里确认，或点「转人工」核实。",
-                tool_calls=["order.get", "address.update"],
-                state="execute_uncertain",
             )
+
+        body = await self._call_write_with_retry(_do_address, state)
+        if tool_failed(body):
+            return await self._handoff_write_uncertain(state, pending, trace_id=trace_id)
         return AgentReply(
             reply=present.render(body),
             tool_calls=["order.get", "address.update"],

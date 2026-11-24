@@ -56,7 +56,11 @@ class IntentClassifier:
         self.keyword_map = keyword_map if keyword_map is not None else settings.keyword_hints
 
     async def classify_detailed(
-        self, user_input: str, *, context: dict[str, Any] | None = None
+        self,
+        user_input: str,
+        *,
+        context: dict[str, Any] | None = None,
+        turns: list[Any] | None = None,
     ) -> ClassifyResult:
         hints = collect_hints(user_input, self.keyword_map)
 
@@ -65,6 +69,7 @@ class IntentClassifier:
                 user_input=user_input,
                 hint_keywords=hints,
                 context=context or {},
+                turns=turns,
             )
 
         try:
@@ -74,11 +79,15 @@ class IntentClassifier:
         return ClassifyResult(result.model_copy(update={"source": IntentSource.LLM}))
 
     async def classify(
-        self, user_input: str, *, context: dict[str, Any] | None = None
+        self,
+        user_input: str,
+        *,
+        context: dict[str, Any] | None = None,
+        turns: list[Any] | None = None,
     ) -> tuple[IntentResult | None, LLMError | None]:
         """返回 (结果, 错误)。错误非空表示 LLM 不可用，调用方须走降级。
 
         保留这个签名给既有调用方与测试；需要区分结构失败时用 classify_detailed。
         """
-        outcome = await self.classify_detailed(user_input, context=context)
+        outcome = await self.classify_detailed(user_input, context=context, turns=turns)
         return outcome.result, outcome.error

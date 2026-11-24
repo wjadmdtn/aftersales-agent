@@ -103,6 +103,14 @@ class PendingConfirmation(BaseModel):
     request_id: str | None = None
 
 
+class Turn(BaseModel):
+    """一轮对话的原文。只用于理解指代，不作为意图判定依据。"""
+
+    role: Literal["user", "assistant"]
+    text: str
+    at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class SessionState(BaseModel):
     session_id: str
     user_id: str
@@ -112,6 +120,11 @@ class SessionState(BaseModel):
     intent: Intent | None = None
     turn_count: int = 0
     clarify_round: int = 0
+    # ---- 记忆：最近若干轮原文 + 从对话中抽取的已知事实 ----
+    # 原文只用于理解"这个""那单"指什么；事实（订单号 / 金额 / 时间 / 诉求）
+    # 才是跨轮不能丢的东西——窗口会被裁剪，事实不会。
+    recent_turns: list[Turn] = Field(default_factory=list)
+    facts: dict[str, str] = Field(default_factory=dict)
     # 政策检索：最近一次引用的条款（多轮追问用）与发生检索的轮次数（评测用）
     last_cited_clause_ids: list[str] = Field(default_factory=list)
     policy_turns: int = 0

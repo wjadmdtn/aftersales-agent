@@ -42,6 +42,7 @@ class StubLLMClient:
         self.call_count = 0
         self.policy_call_count = 0
         self.last_hints: list[str] = []
+        self.last_turns: list[Any] = []
 
     async def classify(
         self,
@@ -49,9 +50,11 @@ class StubLLMClient:
         user_input: str,
         hint_keywords: list[str],
         context: dict[str, Any],
+        turns: list[Any] | None = None,
     ) -> IntentResult:
         self.call_count += 1
         self.last_hints = hint_keywords
+        self.last_turns = list(turns or [])
 
         if self.delay_ms:
             await asyncio.sleep(self.delay_ms / 1000)

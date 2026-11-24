@@ -59,3 +59,5 @@
 {"id":"e2e-clarify-01","category":"e2e","path":"e2e","turns":["嗯"],"context":{"order_id":"ORD1002"},"expect":{"order_status":"PAID"}}
 {"id":"e2e-limit-00","category":"e2e","path":"e2e","turns":["随便说说","还是不懂","嗯"],"context":{"order_id":"ORD1002"},"expect":{"order_status":"PAID","never_state":"handoff_queued"},"notes":"多轮安抚不转人工"}
 {"id":"e2e-irrelevant-00","category":"e2e","path":"e2e","turns":["今天天气不错"],"context":{"order_id":"ORD1002"},"expect":{"order_status":"PAID","never_state":"handoff_queued"},"notes":"闲聊不道歉不转人工"}
+{"id": "e2e-mem-00", "category": "e2e", "path": "e2e", "turns": ["我要改地址", "算了我还是退款吧", "确认"], "context": {"order_id": "ORD1002"}, "expect": {"order_status": "REFUNDED", "refund_count": 1, "first_turn_state": "need_address", "last_turn_state": "executed"}, "notes": "多轮改口：先提改地址（要求填表单），再说改成退款，确认后执行"}
+{"id": "e2e-mem-01", "category": "e2e", "path": "e2e", "turns": ["这个能退吗", "那我要退款", "确认"], "context": {"order_id": "ORD1002"}, "expect": {"order_status": "REFUNDED", "refund_count": 1, "first_turn_state": "inquiry_answered", "last_turn_state": "executed"}, "notes": "多轮改口：先问可行性（不执行），再说要退（弹确认），确认后执行"}

@@ -12,7 +12,6 @@ from decimal import Decimal
 from app.config import Settings, settings
 from app.handoff.priority import calc_priority
 from app.models.handoff import (
-    AttemptedAction,
     Emotion,
     HandoffContext,
     TriggerResult,
@@ -76,7 +75,6 @@ def build_context(
     last_user_message: str,
     emotion: Emotion,
     trigger: TriggerResult,
-    attempted: list[AttemptedAction] | None = None,
     refund_amount: Decimal | None = None,
     cfg: Settings | None = None,
 ) -> HandoffContext:
@@ -84,7 +82,6 @@ def build_context(
     if trigger.trigger_type is None:
         raise ValueError("无法在未触发的情况下构建转接上下文")
 
-    actions = attempted or []
     summary = rule_based_summary(
         primary_intent=primary_intent,
         last_user_message=last_user_message,
@@ -105,7 +102,6 @@ def build_context(
         user_id=user_id,
         order_id=order_id,
         summary=summary,
-        attempted_actions=actions,
         primary_intent=primary_intent,
         sentiment=emotion,
         priority=priority,

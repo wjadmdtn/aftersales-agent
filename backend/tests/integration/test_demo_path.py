@@ -103,7 +103,7 @@ def test_demo_path_end_to_end(http, ws_user, ws_agent):
 
     # ---- ⑥ 上下文包字段齐全（SC-004）----
     ctx = queue[0]
-    for key in ("summary", "attempted_actions", "priority_reason", "trigger_type"):
+    for key in ("summary", "priority_reason", "trigger_type"):
         assert key in ctx
     assert ctx["priority_reason"]
 

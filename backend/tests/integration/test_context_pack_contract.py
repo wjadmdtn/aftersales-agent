@@ -10,7 +10,6 @@ from tests.conftest_app import *  # noqa: F401,F403
 REQUIRED = {
     "session_id",
     "summary",
-    "attempted_actions",
     "priority",
     "priority_reason",
     "trigger_type",

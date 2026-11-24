@@ -36,11 +36,15 @@ class IntentLLM(Protocol):
         user_input: str,
         hint_keywords: list[str],
         context: dict[str, Any],
+        turns: list[Any] | None = None,
     ) -> IntentResult:
         """判断用户真实诉求。
 
         hint_keywords 仅作提示，实现方不得据此直接决定意图——
         同样的词在不同语境下含义相反（威胁 / 咨询 / 历史陈述 / 诉求）。
+
+        turns 是最近若干轮原文，只用于理解指代（"那单""这个"），
+        不得作为本轮意图判定依据。
         """
         ...
 

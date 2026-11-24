@@ -52,6 +52,9 @@ const CONFIRM_ENDED = new Set([
   'expired',
   'no_pending',
   'stale_card',
+  // 写操作结果未知时后端会立即转人工，确认卡也该收起
+  'handoff_queued',
+  'handoff_pending',
 ])
 
 let socket: Socket | null = null

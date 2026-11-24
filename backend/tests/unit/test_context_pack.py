@@ -6,7 +6,7 @@ import pytest
 
 from app.config import Settings
 from app.handoff.context_pack import SUMMARY_MAX_CHARS, build_context, rule_based_summary, truncate
-from app.models.handoff import AttemptedAction, Emotion, ToolStatus, TriggerResult, TriggerType
+from app.models.handoff import Emotion, TriggerResult, TriggerType
 
 CFG = Settings()
 
@@ -56,21 +56,6 @@ def test_risk_has_no_ai_suggestion():
 def test_boundary_has_suggestion():
     ctx = _ctx(_trigger(TriggerType.BOUNDARY))
     assert ctx.suggested_next_step is not None
-
-
-def test_empty_actions_is_list_not_missing():
-    ctx = _ctx(_trigger(TriggerType.USER_REQUEST))
-    assert ctx.attempted_actions == []
-
-
-def test_actions_recorded():
-    ctx = _ctx(
-        _trigger(TriggerType.BOUNDARY),
-        attempted=[AttemptedAction(tool="order.get", result_status=ToolStatus.OK)],
-    )
-    assert len(ctx.attempted_actions) == 1
-    # 工具调用通过结构化字段交给前端展示，摘要只保留诉求、原话与触发原因
-    assert "order.get" not in ctx.summary
 
 
 def test_requires_trigger():
