@@ -11,7 +11,8 @@
 {"id":"policy-no-sevenday","category":"policy","path":"policy","input":"哪些商品不支持七天无理由","context":{"order_id":"ORD1004"},"expect":{"intent":"policy","cited_clause":"RETURN-EXCEPTION-01"},"notes":"政策咨询，期望命中 RETURN-EXCEPTION-01"}
 {"id":"policy-exchange","category":"policy","path":"policy","input":"换货需要什么条件","context":{"order_id":"ORD1002"},"expect":{"intent":"policy","cited_clause":"AFTERSALE-EXCHANGE-01"},"notes":"政策咨询，期望命中 AFTERSALE-EXCHANGE-01"}
 {"id":"policy-exchange-time","category":"policy","path":"policy","input":"换货多久能完成","context":{"order_id":"ORD1002"},"expect":{"intent":"policy","state":"handoff_queued"},"notes":"知识库无对应条款，期望转人工（不得编造）"}
-{"id":"policy-repair","category":"policy","path":"policy","input":"保修怎么申请","context":{"order_id":"ORD1003"},"expect":{"intent":"policy","cited_clause":"AFTERSALE-REPAIR-01"},"notes":"政策咨询，期望命中 AFTERSALE-REPAIR-01"}
+{"id":"policy-repair-01","category":"policy","path":"policy","input":"三包期内坏了能免费修吗","context":{"order_id":"ORD1003"},"expect":{"intent":"policy","cited_clause":"AFTERSALE-REPAIR-01"},"notes":"问的是能不能免费修，条款正文直接对应"}
+{"id":"policy-repair-02","category":"policy","path":"policy","input":"保修怎么申请","context":{"order_id":"ORD1003"},"expect":{"intent":"policy","state":"handoff_queued"},"notes":"知识库只有维修条件、没有申请流程，按 FR-011 必须转人工不得编造"}
 {"id":"policy-invoice","category":"policy","path":"policy","input":"能开发票吗","context":{"order_id":"ORD1002"},"expect":{"intent":"policy","cited_clause":"INVOICE-01"},"notes":"政策咨询，期望命中 INVOICE-01"}
 {"id":"policy-invoice-change","category":"policy","path":"policy","input":"发票开错了能重开吗","context":{"order_id":"ORD1002"},"expect":{"intent":"policy","cited_clause":"INVOICE-01"},"notes":"政策咨询，期望命中 INVOICE-01"}
 {"id":"policy-voucher","category":"policy","path":"policy","input":"售后需要提供什么凭证","context":{"order_id":"ORD1002"},"expect":{"intent":"policy","cited_clause":"INVOICE-02"},"notes":"政策咨询，期望命中 INVOICE-02"}
