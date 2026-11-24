@@ -16,6 +16,7 @@
 | [006 客服前端（订单页 + 对话页 + 人工工作台）](specs/006-web-ui/) | ✅ 完成 |
 | [007 LLM 输出校验重放](specs/007-llm-schema-replay/) | ✅ 完成 |
 | 008 催发货（业务动作） | ✅ 完成 |
+| 会话记忆（多轮上下文与事实抽取） | ✅ 完成 |
 
 ## 催发货：唯一的低风险写操作
 
@@ -65,6 +66,40 @@ Agent 能真的去催单，不只是解释规则。
 指标在 `/agent/health/llm`：`schema_replays` 多而 `schema_failures` 少 = 模型偶尔抽风；
 `schema_failures` 多 = prompt 或模型能力不匹配，该改 prompt 而不是加大重放次数。
 
+## 会话记忆（多轮上下文）
+
+用户常把一件事拆成几句话：先「我那单想退货」，再「上周买的保温杯」，最后才给订单号。
+在此之前，每轮进模型的上下文只有 `{order_id, intent}` 两个字段，前两句的信息每轮都丢，
+只能反复追问。
+
+现在分两层存，职责不同：
+
+| 层 | 内容 | 用途 |
+|---|---|---|
+| **结构化事实** `facts` | 订单号、金额、相对时间、诉求 | 跨轮不丢，写进 system prompt |
+| **原文窗口** `recent_turns` | 最近 6 条消息（含助手回复），上限 1500 字 | 只用于理解「那单」「这个」指代 |
+
+两者都存在 `SessionState`（Redis，24h）。请求结构从「system + 一条 user（上下文拼成字符串）」
+变成真正的多轮：
+
+```
+system    意图规则 + 【已知事实】订单号：ORD1002；诉求：退款
+user      我要退款
+assistant 请确认：即将为订单 ORD1002 提交退款 300 元，确认吗？
+user      上周买的保温杯          ← 本轮
+```
+
+三条刻意的取舍：
+
+1. **事实用规则抽，不调模型。** 订单号 / 金额 / 相对时间都是正则能覆盖的，
+   为记住一个订单号每轮多花一次模型调用（内网单次 20~40 秒）不划算。
+2. **事实与原文分开。** 窗口会被裁剪，事实不会；历史原文只用于理解指代，
+   不参与意图判定——历史里那句「我要退款」可能只是抱怨。
+3. **低信息轮次不占窗口。** 「嗯」「好的」这类短确认不记录，避免把窗口挤满。
+
+开关：`MOCK_MEMORY_ENABLED`（默认开，可一键回到改造前）、`MOCK_MEMORY_RECENT_TURNS`、
+`MOCK_MEMORY_MAX_CHARS`、`MOCK_MEMORY_FACTS_MAX`。
+
 ## 政策 RAG 演进（005 之后）
 
 005 交付时是**纯向量检索 + 阈值判定**，实测有两类问题：答非所问（「能合并订单发货吗」
@@ -89,8 +124,9 @@ Agent 能真的去催单，不只是解释规则。
 
 ## 评测结果
 
-299 条用例，按**处理路径**判分。以下为 `--llm=real`（deepseek-v4-flash）+ bge 的实测数字，
-可直接引用；桩（`--llm=stub`）的报告准确率虚高，**不可对外引用**。
+302 条用例，按**处理路径**判分（业务动作 / 澄清 / 转人工 / 无关输入 / 政策 / 端到端）。
+下表为 `--llm=real`（deepseek-v4-flash）的实测数字，跑批日期见表格脚注；
+桩（`--llm=stub`）的报告准确率虚高，**不可对外引用**。
 
 跑完自动生成 HTML 报告并打开（`eval/report/latest.html`，支持按路径筛选、搜 ID、只看失败）：
 
@@ -103,16 +139,21 @@ Agent 能真的去催单，不只是解释规则。
 | 转人工误转率 | **0.0%** (0/12) | 不该转却转了 |
 | 转人工正确率 | **100%** (30/30) | |
 | 反问引导正确率 | **100%** (40/40) | |
-| 意图识别总体 | **94.0%** (218/232) | |
-| 政策问答准确率 | **93.3%** (28/30) | 引用条款与预期一致才算对 |
+| 意图识别总体 | **92.9%** (221/238) | |
+| 政策问答准确率 | **96.7%** (29/30) | `bge` 单独跑 31 条的结果；全量跑批用 stub embedder 时的 76.7% 不可引用 |
 | 政策误路由率 | **0.0%** (0/5) | 政策问题被误判成业务动作 |
-| 端到端成功率 | **100%** (60/60) | 多轮跑完整业务链路 |
+| 端到端成功率 | **98.4%** (62/63) | 多轮跑完整业务链路 |
 | 无关输入正确率 | **100%** (20/20) | |
 | 话术承诺泄露 | **0** 次 | 反问引导话术不得出现「退款/退换/补偿」等承诺 |
-| 业务动作准确率 | **89.3%** (100/112) | 含 adversarial / no_keyword 等难样本 |
-| ├ standard | 96.4% (53/55) | 标准表述 |
-| ├ adversarial | 84.4% (27/32) | 对抗表述（威胁、否定、转述） |
+| 业务动作准确率 | **91.5%** (108/118) | 含 adversarial / no_keyword 等难样本 |
+| ├ standard | 98.3% (58/59) | 标准表述 |
+| ├ adversarial | 88.2% (30/34) | 对抗表述（威胁、否定、转述） |
 | └ no_keyword | 75.0% (15/20) | 不含意图关键词的诉求 |
+
+> **跑批口径（2026-11-24）**：301 条用例、串行、`deepseek-v4-flash`。非检索类指标用 `stub`
+> embedder（不影响意图与流程判定）；政策问答准确率为同日 `bge` 单独跑 31 条的结果，两者口径
+> 不同，不要横向比较绝对值。此后新增了 2 条多轮记忆用例、政策用例拆分 1 条（现共 302 条），
+> 下次统一口径跑批后更新本表。
 
 失败用例可在报告页直接筛出，查看输入、期望、实际三列对照。
 
@@ -129,9 +170,12 @@ Agent 能真的去催单，不只是解释规则。
 **重跑方式**：
 
 ```bash
-python eval/runner.py --llm=real --embedder=bge   # 约 11 分钟（299 条，内网模型）
-python eval/runner.py --llm=stub                  # 秒级，仅验链路
+# 串行跑，并发会把内网网关打到限流降级
+python -m eval.runner --llm=real --embedder=bge --concurrency=1
+python -m eval.runner --llm=stub                    # 秒级，仅验链路
 ```
+
+真实模型跑批的耗时与限流注意事项见 [docs/troubleshooting.md](docs/troubleshooting.md)。
 
 回归阈值：总体 3 个百分点、关键单项 5 个百分点、硬性项（承诺泄露 / 降级期写操作 /
 静默违规）**0 容忍**，超阈值即输出阻断原因，不是只给退出码。
@@ -149,21 +193,10 @@ cd backend && uvicorn app.main:app --reload
 cd backend && PYTHONIOENCODING=utf-8 python -m pytest -q
 ```
 
-> **真实 embedding（可选）**：`.env` 里配 `MOCK_RAG_EMBEDDER=bge` 才走真模型，
-> 需要额外装 `sentence-transformers`（会拉 torch，体积较大）：
->
-> ```bash
-> # 必须锁 3.x：sentence-transformers 6.x 会强制 transformers>=5，
-> # 而 transformers 5 已移除 bge-small-zh-v1.5 这类模型的旧式加载路径，
-> # 装成 6.x 会在启动时抛 "Unrecognized processing class in BAAI/bge-small-zh-v1.5"
-> uv pip install "sentence-transformers>=3.4,<4"
-> ```
->
-> 不装也不要紧——把它设成 `stub` 或删掉该行即可，检索逻辑照常跑，只是相似度是
-> 伪随机的。**测试永远用 stub**，不会加载真模型。
->
-> 配了真模型时 `MOCK_RAG_TIMEOUT_MS` 建议 ≥ 90000：rerank 让政策链路变成三次
-> 模型调用，默认 30 秒对内网慢模型必然超时。
+> **真实 embedding（可选）**：`.env` 里配 `MOCK_RAG_EMBEDDER=bge` 才走真模型，需要额外装
+> `sentence-transformers`。版本锁、镜像下载、离线加载、超时设置等环境细节见
+> [docs/troubleshooting.md](docs/troubleshooting.md)。不装也能跑——设成 `stub` 即可，
+> 只是相似度是伪随机的；**测试永远用 stub**。
 
 前端：
 
@@ -175,9 +208,8 @@ npm run dev                        # 开发模式，代理到 :8000
 npm run typecheck && npm run test && npm run build
 ```
 
-> **本地无 Redis 时**可用 `cd backend && python -m uvicorn dev_server:app --port 8000`，
-> 它用 fakeredis 顶替；同时把 `backend/.env` 里的 `MOCK_LLM_BASE_URL` 置空以走桩模型
-> （否则会连真实内网模型，慢且消耗额度）。
+> **本地无 Redis 时**可用 `dev_server` 启动（fakeredis 顶替），见
+> [docs/troubleshooting.md](docs/troubleshooting.md)。
 
 构建产物进镜像后由后端托管：
 
@@ -228,8 +260,9 @@ docker compose up --build
 ├── .specify/            SDD 宪法、模板、脚本
 ├── specs/              每个 feature 的 spec / plan / tasks / contracts
 ├── backend/            Python + FastAPI 服务
-├── _prototype/         引入 SDD 前的原型代码（仅供对照，不要在此继续开发）
-└── frontend/           Vue3 + TS（Feature 005 起）
+├── frontend/           Vue3 + TS
+├── docs/               环境与踩坑记录、评测报告截图
+└── _prototype/         引入 SDD 前的原型代码（仅供对照，不要在此继续开发）
 ```
 
 ## 已知范围外
